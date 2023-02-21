@@ -136,3 +136,199 @@ NHPP_neg_LL <- function(par, points, z_t){
 
 (opt <- optimize(NHPP_neg_LL, interval = c(0,5), points=NHPP_points, z_t=z_t))
 
+
+#------------------------ 2-D covarite dependent point pattern-------------------------------------
+
+library(tidyverse)
+
+# Points on x and y axis at which to evaluate intensity
+axis_ticks <- seq(from = -10, to = 10, length.out = 501)
+
+# Construct covariate grid
+a <- 2
+b <- 4
+covariate <- tibble(
+  x = rep(axis_ticks, times = length(axis_ticks)),
+  y = rep(axis_ticks, each  = length(axis_ticks)),
+  r = sqrt(x^2 + y^2),
+  theta = atan2(y, x), # angle in radians - not actually needed
+  g = a * abs(sin(b * r))
+)
+
+covariate_for_conor <- covariate %>% select(x,y,g)
+
+covariate_for_conor %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = g))
+
+true_intensity <- tibble(covariate_for_conor, lambda = 4 + 20*g)
+true_intensity %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))
+
+max_intensity <- max(true_intensity$lambda)
+
+num_points <- rpois(1, max_intensity*(20^2))
+HPP_points <- tibble(
+  x = runif(num_points, -10, 10),
+  y = runif(num_points, -10, 10)
+)
+
+true_intensity %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))+
+  geom_point(data=HPP_points)
+
+lambda_fun <- function(x,y){
+  r <- sqrt(x^2 + y^2)
+  return(4+20*(2*abs(sin(4*r))))
+}
+
+HPP_points <- tibble(HPP_points, p_thin=lambda_fun(HPP_points$x, HPP_points$y)/max_intensity)
+u <- runif(num_points)
+keep <- HPP_points$p_thin > u
+
+NHPP_points <- tibble(HPP_points[keep,])
+
+true_intensity %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))+
+  geom_point(data=HPP_points)+
+  geom_point(data=NHPP_points, aes(colour="red"))
+
+
+#--------------- Intensities from Zak's thesis ---------------------------------
+
+#Simulated covariate
+
+# Points on x and y axis at which to evaluate intensity
+lower_limit<- -10
+upper_limit<- 10
+axis_ticks <- seq(from = lower_limit, to = upper_limit, length.out = 501)
+area <- (u-l)^2
+# Construct covariate grid
+a <- 10
+b <- 4
+covariate <- tibble(
+  x = rep(axis_ticks, times = length(axis_ticks)),
+  y = rep(axis_ticks, each  = length(axis_ticks)),
+  r = sqrt(x^2 + y^2),
+  theta = atan2(y, x), # angle in radians - not actually needed
+  g = a * abs(sin(b * r))
+)
+
+covariate_sim<- covariate %>% select(x,y,g)
+
+covariate_sim %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = g))
+#---------------------Model S1-----------------------
+
+true_intensity_S1 <- tibble(covariate_sim, lambda = 0.33*g)
+true_intensity_S1 %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))
+
+max_intensity <- max(true_intensity_S1$lambda)
+
+num_points <- rpois(1, max_intensity*area)
+HPP_points <- tibble(
+  x = runif(num_points, lower_limit, upper_limit),
+  y = runif(num_points, lower_limit, upper_limit)
+)
+
+true_intensity_S1 %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))+
+  geom_point(data=HPP_points)
+
+lambda_fun <- function(x,y){
+  r <- sqrt(x^2 + y^2)
+  g <- a*abs(sin(b*r))
+  return(0.33*g)
+}
+
+HPP_points <- tibble(HPP_points, p_thin=lambda_fun(HPP_points$x, HPP_points$y)/max_intensity)
+U <- runif(num_points)
+keep <- HPP_points$p_thin > U
+
+NHPP_points <- tibble(HPP_points[keep,])
+
+true_intensity_S1 %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))+
+  geom_point(data=HPP_points)+
+  geom_point(data=NHPP_points, aes(colour="red"))
+
+#-------------------- Model S2----------------------
+
+covariate_sim <- covariate_sim %>% mutate(g_shift = 0.3+g) #Shifting as dividing by small values was giving an infinite rate
+covariate_sim <- covariate_sim %>% mutate(rate=(g_shift-lag(g_shift))/lag(g_shift))
+
+true_intensity_S2 <- tibble(covariate_sim, lambda = (9.6e-2)*abs(rate) )
+true_intensity_S2 <- true_intensity_S2[!is.na(true_intensity_S2$rate),]
+true_intensity_S2 %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))
+
+max_intensity_S2 <- max(true_intensity_S2$lambda)
+
+
+num_points <- rpois(1, max_intensity_S2*area)
+HPP_points <- tibble(
+  x = runif(num_points, lower_limit, upper_limit),
+  y = runif(num_points, lower_limit, upper_limit)
+)
+
+true_intensity_S2 %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))+
+  geom_point(data=HPP_points)
+
+#Need to think of different way to do this!
+lambda_fun <- function(x,y){
+  r <- sqrt(x^2 + y^2)
+  g <- a*abs(sin(b*r))
+  g_shift <- 0.3 + g
+  rate <- (g_shift-lag(g_shift))/lag(g_shift)
+  return((9.6e-2)*abs(rate))
+}
+
+HPP_points <- tibble(HPP_points, p_thin=lambda_fun(HPP_points$x, HPP_points$y)/max_intensity_S2)
+U <- runif(num_points)
+keep <- HPP_points$p_thin > U
+
+NHPP_points <- tibble(HPP_points[keep,])
+
+true_intensity_S2 %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))+
+  geom_point(data=HPP_points)+
+  geom_point(data=NHPP_points, aes(colour="red"))
+
+
+#----------------------Model S3---------------------
+shift <- 0.02
+covariate_sim <- covariate_sim %>% mutate(g_shift = shift+g) #Shifting as dividing by small values was giving an infinite rate
+covariate_sim <- covariate_sim %>% mutate(rate=(g_shift-lag(g_shift))/lag(g_shift))
+
+true_intensity_S3 <- tibble(covariate_sim, lambda = (7e-4)*abs(rate)*(1 + 21.8*g) )
+true_intensity_S3 <- true_intensity_S3[!is.na(true_intensity_S3$rate),]
+true_intensity_S3 %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))
+
+max_intensity_S3 <- max(true_intensity_S3$lambda)
+
+
+num_points <- rpois(1, max_intensity_S3*area)
+HPP_points <- tibble(
+  x = runif(num_points, lower_limit, upper_limit),
+  y = runif(num_points, lower_limit, upper_limit)
+)
+
+true_intensity_S3 %>%
+  ggplot(mapping = aes(x = x, y = y)) +
+  geom_raster(mapping = aes(fill = lambda))+
+  geom_point(data=HPP_points)
+
