@@ -332,3 +332,12 @@ true_intensity_S3 %>%
   geom_raster(mapping = aes(fill = lambda))+
   geom_point(data=HPP_points)
 
+
+#------------------Model E2 (best) -----------------------
+shift <- 0.02
+covariate_sim <- covariate_sim %>% mutate(g_shift = shift+g) #Shifting as dividing by small values was giving an infinite rate
+covariate_sim <- covariate_sim %>% mutate(rate=(g_shift-lag(g_shift))/lag(g_shift))
+
+true_intensity_E2 <- tibble(covariate_sim, lambda = (2.6e-3)*abs(rate)*(1 + 2.7e-1*g)*exp(2.7e-1*g)  )
+
+
