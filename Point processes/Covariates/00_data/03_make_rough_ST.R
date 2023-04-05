@@ -7,7 +7,7 @@ MAKE_PLOTS = FALSE
 SAVE_PLOTS = FALSE
 PLOT_PATH  = "99_output/99_covariate_plots/ST_annual_rough_and_smooth.pdf"
 
-CSV_PATH = "00_data/derived/covariates/strainThicknessRough_1.csv"
+CSV_PATH = "Point processes/Covariates/00_data/derived/covariates/strainThicknessRough_1.csv"
 
 # Load packages
 library(fields)
@@ -17,15 +17,15 @@ library(MASS)
 ## 0.2: Read data --------------------------------------------------------------
 
 ## Read strain thickness data
-csv_path <- "00_data/raw/ReservoirModel_rm03_s01_24bcm_strainthickness_linear.csv"
+csv_path <- "Point processes/Covariates/00_data/raw/ReservoirModel_rm03_s01_24bcm_strainthickness_linear.csv"
 st <- read.csv(csv_path,header = TRUE)
 
 ## Read compaction data
-csv_path <- "00_data/raw/ReservoirModel_rm02_s01_24bcm_compaction_linear.csv"
+csv_path <- "Point processes/Covariates/00_data/raw/ReservoirModel_rm02_s01_24bcm_compaction_linear.csv"
 compaction <- read.csv(csv_path,header = TRUE)
 
 ## Read topographic gradient data
-csv_path <- "00_data/raw/ReservoirModel_sm01_topograds.csv"
+csv_path <- "Point processes/Covariates/00_data/raw/ReservoirModel_sm01_topograds.csv"
 topo_grads <- read.csv(csv_path,header = TRUE)
 
 if (MAKE_PLOTS){

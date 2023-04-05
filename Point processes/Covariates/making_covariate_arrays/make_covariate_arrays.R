@@ -2,11 +2,11 @@
 
 ## Script parameters -----------------
 SAVE_COVS <- TRUE
-DATA_PATH <- "00_data/derived/covariates/"
+DATA_PATH <- "Point processes/Covariates/00_data/derived/covariates/"
 
 MAKE_PLOTS <- TRUE
 SAVE_PLOTS <- TRUE
-PLOT_PATH <- "99_output/00_data/covariates/"
+PLOT_PATH <- "Point processes/Covariates/Output/plots/"
 
 REPLACE_NEGATIVES <- TRUE
 REPLACEMENT_VALUE <- 1e-9
@@ -23,16 +23,16 @@ library(abind)  # for temporal differencing of covariates
 
 ## Source required scripts --------------
 #source("../31_topographic_gradient/topograd_opt_smooth_functions.R")
-source("making_covarite_arrays/covariate_array_functions.R")
+source("Point processes/Covariates/making_covariate_arrays/covariate_array_functions.R")
 ## Read in relevant data ----------------
 
 # Groningen field outline
-SPgfo<- readRDS("00_data/derived/field_outline/SPgfo.RDS")
-inPolyVec <- readRDS("00_data/derived/inPoly/inPolyVec.RDS")
-inPolyMat <- readRDS("00_data/derived/inPoly/inPolyMat.RDS")
+SPgfo<- readRDS("Point processes/Covariates/00_data/derived/field_outline/SPgfo.RDS")
+inPolyVec <- readRDS("Point processes/Covariates/00_data/derived/inPoly/inPolyVec.RDS")
+inPolyMat <- readRDS("Point processes/Covariates/00_data/derived/inPoly/inPolyMat.RDS")
 
 # topographic gradient ---------------------------------------------------------
-tg <- read.csv('00_data/raw/ReservoirModel_sm01_topograds.csv',header = TRUE)
+tg <- read.csv('Point processes/Covariates/00_data/raw/ReservoirModel_sm01_topograds.csv',header = TRUE)
 tg_mats <- make_cov_mats(
   cov_df = tg,
   df_t0 = 1957,
@@ -62,7 +62,7 @@ if(MAKE_PLOTS){
 }
 
 # Compressibility --------------------------------------------------------------
-csv_path <- "C:/Users/murphyc4/OneDrive - Lancaster University/STOR-i/PhD/Projects/zv-cm-code/point-process-simulation/seis-mod-dev-v6/seis-mod-dev-v6/inputs/reservoirs/ReservoirModel_compressibility_20180122.csv"
+csv_path <- "Point processes/seis-mod-dev-v6/seis-mod-dev-v6/inputs/reservoirs/ReservoirModel_compressibility_20180122.csv"
 ##----------STOPPED------------------
 compress_df <- read.csv(csv_path)
 
@@ -128,7 +128,7 @@ if(MAKE_PLOTS){
 
 
 ## Compaction (Shell) ---------------------------------------------------------
-csv_path <- "00_data/raw/ReservoirModel_rm02_s01_24bcm_compaction_linear.csv"
+csv_path <- "Point processes/Covariates/00_data/raw/ReservoirModel_rm02_s01_24bcm_compaction_linear.csv"
 compaction_df <- read.csv(csv_path)
 
 compaction_mats <- make_cov_mats(
@@ -162,7 +162,7 @@ if(MAKE_PLOTS){
 
 # Pressure depletion -----------------------------------------------------------
 
-pressure <- read.csv("C:/Users/murphyc4/OneDrive - Lancaster University/STOR-i/PhD/Projects/zv-cm-code/point-process-simulation/seis-mod-dev-v6/seis-mod-dev-v6/inputs/reservoirs/reservoir_gf_2021_pressure.csv")
+pressure <- read.csv("Point processes/seis-mod-dev-v6/seis-mod-dev-v6/inputs/reservoirs/reservoir_gf_2021_pressure.csv")
 
 # note: pressure is measured at days rather than over years so there is an extra
 # column as compared to compaction. To adjust for this calculate pressure

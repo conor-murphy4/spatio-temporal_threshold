@@ -12,7 +12,7 @@
 
 Catalogue<- function(EC, minMag = 1.5, minDate = '1995-01-01' , maxDate = '2014-12-31'){
   # Format EC columnns as dates
-  EC$Date <- dmy(EC$Date)
+  EC$Date <- ymd(EC$Date)
   EC$Time_UT <- hms(EC$Time_UT)
 
   #Trim to range
@@ -233,7 +233,7 @@ smooth_cov_mat <- function(image, lambda, inpolymat){
   # image  = matrix of observed values
   # lambda = smoothing length scale (m)
   im <- spatstat.geom::as.im(X = image)
-  smoothed_im <- spatstat.core::blur(
+  smoothed_im <- spatstat.explore::blur(
     x = im,
     sigma = lambda / 500,
     kernel = "gaussian",

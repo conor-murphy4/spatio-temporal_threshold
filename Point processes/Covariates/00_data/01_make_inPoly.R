@@ -6,8 +6,8 @@ library(sp)
 
 #---------------------------------------------------------
 # Read Field Outline
-Outline <- read.csv('./raw/Field_outline.csv', header = TRUE)
-Cov <- read.csv('./raw/ReservoirModel_sm01_topograds.csv')
+Outline <- read.csv('Point processes/Covariates/00_data/raw/Field_outline.csv', header = TRUE)
+Cov <- read.csv('Point processes/Covariates/00_data//raw/ReservoirModel_sm01_topograds.csv')
 
 pol<-Polygon(coords = Outline[,1:2],hole = FALSE)
 pols<- Polygons(list(pol),ID="1")
@@ -32,7 +32,7 @@ rm(Outline,pol,pols,SpPols,SPgfo,polyx, polyy, boxx,boxy, Cov)
 
 #---------------------------------------------------------
 # Save logical vector and matrix for use in analyses
-saveRDS(object = inPolyVec,file =  "./derived/inPoly/inPolyVec.RDS")
-saveRDS(object = inPolyMat,file =  "./derived/inPoly/inPolyMat.RDS")
+saveRDS(object = inPolyVec,file =  "Point processes/Covariates/00_data/derived/inPoly/inPolyVec.RDS")
+saveRDS(object = inPolyMat,file =  "Point processes/Covariates/00_data/derived/inPoly/inPolyMat.RDS")
 
 ## EOF ----

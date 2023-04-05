@@ -6,8 +6,8 @@ print("This is S4_fitting.R.")
 ## 00: Set up envrionment. Load packages, scripts and data. --------------------
 ##
 
-PLOT_PATH  <- "Output/plots/"
-DATA_PATH  <- "Output/data/"
+PLOT_PATH  <- "Point processes/Covariates/Output/plots/"
+DATA_PATH  <- "Point processes/Covariates/Output/data/"
 MAKE_PLOTS <- TRUE
 SAVE_PLOTS <- TRUE
 RUN_ALL <- TRUE    # run all code or load results for slow parts?
@@ -21,17 +21,17 @@ library(mgcv)
 library(purrr)
 
 ## Source required scripts --------------
-source("S4_ics_exponential/S4_functions.R")
+source("Point processes/Covariates/S4_ics_exponential/S4_functions.R")
 
 ## Read in relevant data ----------------
 
 # Groningen field outline
-SPgfo <- readRDS("00_data/derived/field_outline/SPgfo.RDS")
-inPolyVec <- readRDS("00_data/derived/inPoly/inPolyVec.RDS")
-inPolyMat <- readRDS("00_data/derived/inPoly/inPolyMat.RDS")
+SPgfo <- readRDS("Point processes/Covariates/00_data/derived/field_outline/SPgfo.RDS")
+inPolyVec <- readRDS("Point processes/Covariates/00_data/derived/inPoly/inPolyVec.RDS")
+inPolyMat <- readRDS("Point processes/Covariates/00_data/derived/inPoly/inPolyMat.RDS")
 
 # incremental Coulomb Stress covariate
-ics_mats <- readRDS("00_data/derived/covariates/incremental_Coulomb_stress_mats.RDS")
+ics_mats <- readRDS("Point processes/Covariates/00_data/derived/covariates/incremental_Coulomb_stress_mats.RDS")
 ics_mats <- subset_to_years_cov_mats(ics_mats, 1995, 2017)
 
 #ics_rate_mats <- temporal_difference_cov_mats(ics_mats, "ics_rate")
@@ -39,9 +39,9 @@ ics_mats <- subset_to_years_cov_mats(ics_mats, 1995, 2017)
 #plot_cov_mats(ics_rate_mats, zlim = c(0,0.4))
 
 # Earthquake catalogue
-EqCat <- read.csv('C:/Users/murphyc4/OneDrive - Lancaster University/STOR-i/PhD/Projects/Spatio-temporal/Data/Events/2022-04-12_15-09-25_cat.csv', header = TRUE)
+EqCat <- read.csv('Data/Events/2022-04-12_15-09-25_cat.csv', header = TRUE)
 colnames(EqCat)[1:5] <- c("Date", "Time_UT", "Easting", "Northing", "Magnitude" )
-Cat <- Catalogue(EC = EqCat, minMag = 1.5, maxDate = '2022-04-01')
+Cat <- Catalogue(EC = EqCat, minMag = 1.5, maxDate = '2016-12-31')
 rm(EqCat)
 
 
