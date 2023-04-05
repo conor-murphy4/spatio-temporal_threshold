@@ -1,0 +1,19 @@
+{
+    "Mmin": 1.5,
+    "Mmax": 7,
+    "output_dir": "outputs/compare",
+    "figure_format": "png",
+    "simulation": {
+        "random_seed": null,
+        "catalogues_simulate": 10000,
+        "catalogues_select": 501,
+        "events_training": 140,
+        "events_evaluation": 140
+    },
+    "mcmc": {
+        "cores": 1,
+        "chains": 2,
+        "draws": 10000,
+        "tune": 10000
+    }
+}

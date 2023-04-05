@@ -1,0 +1,12 @@
+{
+    "label": "uni.uni1",
+    "type": "UniformRate",
+    "dof": {
+        "beta0": {
+            "distr": "uniform",
+            "value": -25,
+            "lower": -30,
+            "upper": -20
+        }
+    }
+}

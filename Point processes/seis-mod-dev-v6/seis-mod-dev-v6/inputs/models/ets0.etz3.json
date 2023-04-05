@@ -1,0 +1,42 @@
+{
+    "label": "ets0.etz3",
+    "type": "ExponentialTrendZeta",
+    "dof": {
+        "beta2": {
+            "distr": "constant",
+            "value": 3500.0,
+            "lower": 1000.0,
+            "upper": 10000.0
+        },
+        "beta3": {
+            "distr": "constant",
+            "value": 1.1,
+            "lower": 0.3,
+            "upper": 2.0
+        },
+        "beta4": {
+            "distr": "constant",
+            "value": 7.0,
+            "lower": 2.0,
+            "upper": 10.0
+        },
+        "theta0": {
+            "distr": "uniform",
+            "value": 0.67,
+            "lower": 0.0,
+            "upper": 1.0
+        },
+        "theta1": {
+            "distr": "uniform",
+            "value": 0.0,
+            "lower": 0.0,
+            "upper": 1.0
+        },
+        "theta2": {
+            "distr": "uniform",
+            "value": 0.0,
+            "lower": 0.0,
+            "upper": 15.0
+        }
+    }
+}

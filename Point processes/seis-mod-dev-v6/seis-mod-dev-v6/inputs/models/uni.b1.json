@@ -1,0 +1,18 @@
+{
+    "label": "uni.b1",
+    "type": "UniformBetaZeta",
+    "dof": {
+        "beta": {
+            "distr": "uniform",
+            "value": 0.67,
+            "lower": 0.0,
+            "upper": 3.0
+        },
+        "zeta": {
+            "distr": "constant",
+            "value": 0.0,
+            "lower": 0.0,
+            "upper": 1.0
+        }
+    }
+}

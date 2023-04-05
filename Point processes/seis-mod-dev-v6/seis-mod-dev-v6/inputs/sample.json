@@ -1,0 +1,36 @@
+{
+    "Mmin": 1.5,
+    "output_dir": "outputs/sample",
+    "figure_format": "png",
+    "training": {
+        "start": [1995, 1, 1],
+        "end": [2021, 1, 1]
+    },
+    "evaluation": {
+        "start": [2013, 1, 1],
+        "end": [2019, 1, 1]
+    },
+    "mcmc": {
+        "cores": 2,
+        "chains": 2,
+        "draws": 30000,
+        "tune": 30000
+    },
+    "smoothing_sigmas": {
+        "pressure": 3000,
+        "compressibility": null,
+        "thickness": null
+    },
+    "median_kernel_sizes": {
+        "pressure": null,
+        "compressibility": null,
+        "thickness": null
+    },
+    "paths": {
+        "catalogue": "catalogues/eventcatalogue20210104_newpolygon.csv",
+        "faults": "reservoirs/FaultModel_geometries.csv",
+        "pressure": "reservoirs/reservoir_gf_2021_pressure.csv",
+        "compressibility": "reservoirs/ReservoirModel_compressibility_20180122.csv",
+        "thickness": "reservoirs/ReservoirModel_thickness_20171013.csv"
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "label": "uni.b1mc1",
+    "type": "UniformBetaCornerMagnitude",
+    "dof": {
+        "beta": {
+            "distr": "uniform",
+            "value": 0.67,
+            "lower": 0.0,
+            "upper": 3.0
+        },
+        "Mc": {
+            "distr": "uniform",
+            "value": 7.0,
+            "lower": 1.5,
+            "upper": 7.0
+        }
+    }
+}
