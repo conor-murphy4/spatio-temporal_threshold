@@ -8,4 +8,10 @@ ind <- KNMI_list[,2] %in% unique(iris_all_current$Station) #Which KNMI station l
 (KNMI_missed <- KNMI_list[!ind,]) #Finding missing stations
 KNMI_missed[,2] #Missing station IDs
 
+write.csv(iris_all_current, "Data/Geophones/Geophone data/iris_current.csv")
+iris_all_current$End_date
 
+ind_2 <- KNMI_missed[,4] %in% round(iris_all_current$Latitude,4)
+KNMI_missed[!ind_2,]
+
+KNMI_list[,4]
