@@ -27,11 +27,20 @@ points(geo$Xcoord, geo$Ycoord, pch=4, col="red", cex=1.5)
 a <- seq(227750, 269750, by=500)
 b <- seq(565250, 615750, by=500)
 grid <- expand.grid(a,b)
-points(grid$Var1, grid$Var2, pch=19)
+points(grid$Var1, grid$Var2, pch="|")
 
-icsgrid <- expand.grid(ics$xgrid, ics$ygrid)
-points(icsgrid$Var1, icsgrid$Var2, col="red")
+# icsgrid <- expand.grid(ics$xgrid, ics$ygrid)
+# points(icsgrid$Var1, icsgrid$Var2, col="red")
 
-ics$ics[10,10,10]
+#Accessing elements
+head(ics)
+dim(ics[[1]][,,45]) #dimensions of matrix of ics across space at point in time
+print(ics[[1]][40,45,]) #vector of ics over time at one point in space
+length(ics[[1]][40,45,]) #length of vector of ics over time at one point in space
+
+#Temporal derivative
 
 
+#Intensity (w/o temproal derivative)
+
+intensity <- B0*2*exp(B1*ics[[1]][,,1])
