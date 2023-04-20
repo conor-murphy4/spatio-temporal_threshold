@@ -1,6 +1,8 @@
 library(tidyverse)
 library(dplyr)
 
+source("Point processes/Covariates/making_covariate_arrays/covariate_array_functions.R")
+
 Opt  <- readRDS("Point processes/Covariates/Output/data/Opt_S4.RDS")
 Opt
 B0 <- Opt$par[1]
@@ -39,8 +41,13 @@ print(ics[[1]][40,45,]) #vector of ics over time at one point in space
 length(ics[[1]][40,45,]) #length of vector of ics over time at one point in space
 
 #Temporal derivative
+ics_rate <- temporal_difference_cov_mats(ics)
+dim(ics_rate[[1]])
 
+#Intensity (w/o temporal derivative)
+intensity <- ics
+intensity[[1]] <- B0*ics_rate[[1]]*exp(B1*ics[[1]]) #This is our space-time varying intensity
 
-#Intensity (w/o temproal derivative)
+#Now, we need to isolate grid cubes, take intensity value, calculate no. of points 
+#within grid box by n=intensity[x,y,t]*volume and locate events uniformly across the cube
 
-intensity <- B0*2*exp(B1*ics[[1]][,,1])

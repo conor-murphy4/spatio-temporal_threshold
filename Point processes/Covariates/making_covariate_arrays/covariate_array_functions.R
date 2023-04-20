@@ -132,7 +132,7 @@ temporal_difference_cov_mats <- function(cov_mats, new_name= NULL){
   out <- cov_mats
   n_slices <- dim(out[[1]])[3]
   out[[1]] <- out[[1]][,,-1] - out[[1]][,,-n_slices]
-  abind::abind(out[[1]], out[[1]][,,1]*NA, along = 3)
+  out[[1]] <- abind::abind(out[[1]], out[[1]][,,1]*NA, along = 3) 
   out
 }
 
