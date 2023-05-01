@@ -2,6 +2,8 @@ library(tidyverse)
 library(dplyr)
 
 source("Point processes/Covariates/making_covariate_arrays/covariate_array_functions.R")
+source("Point processes/Covariates/S4_ics_exponential/S4_functions.R")
+source("helper_functions.R")
 
 Opt  <- readRDS("Point processes/Covariates/Output/data/Opt_S4.RDS")
 Opt
@@ -40,14 +42,73 @@ dim(ics[[1]][,,45]) #dimensions of matrix of ics across space at point in time
 print(ics[[1]][40,45,]) #vector of ics over time at one point in space
 length(ics[[1]][40,45,]) #length of vector of ics over time at one point in space
 
-#Temporal derivative
+#Temporal derivative ####NEED TO UPDATE FUNCTION!!
 ics_rate <- temporal_difference_cov_mats(ics)
 dim(ics_rate[[1]])
 
-#Intensity (w/o temporal derivative)
+#Intensity 
 intensity <- ics
 intensity[[1]] <- B0*ics_rate[[1]]*exp(B1*ics[[1]]) #This is our space-time varying intensity
+names(intensity)[1] <- "intensity"
+
+REPLACE_NEGATIVES <- TRUE
+REPLACEMENT_VALUE <- 1e-9
+
+intensity<- replace_negatives_cov_mats(
+  cov_mats = intensity,
+  replace = REPLACE_NEGATIVES,
+  replacement_value = REPLACEMENT_VALUE)
+
 
 #Now, we need to isolate grid cubes, take intensity value, calculate no. of points 
 #within grid box by n=intensity[x,y,t]*volume and locate events uniformly across the cube
+# library(fields)
+# PLOT_PATH <- "Point processes/Intensity/"
+# pdf_path <- paste0(PLOT_PATH, "S4_intensity.pdf")
+# pdf(pdf_path, width = 7,height = 5)
+# plot_cov_mats(intensity, cov_name = "Intensity")
+# dev.off()
+
+
+
+#Simulating PP
+sim_PP <- function(intensity, grid_box_area, x_length = 250, y_length = 250, t_length = 0.5 ){
+  Int_intensity <- sum(intensity[[1]], na.rm = TRUE)*grid_box_area
+  n_total <- rpois(1, Int_intensity)
+  # x_loc <- y_loc <- t_loc <- numeric(n_total)
+  # tgrid <- intensity$tgrid
+  # ygrid <- intensity$ygrid
+  # xgrid <- intensity$xgrid
+  n_elements <- length(c(intensity[[1]]))
+  probs <- c(intensity[[1]])
+  probs[is.na(probs)] <- 0
+  grid_boxes <- sample( c(1:n_elements), n_total, prob=probs, replace = TRUE)
+  points <- box.no2xyt(grid_boxes, minX = min(intensity$xgrid), minY = min(intensity$ygrid), minYr = min(intensity$tgrid))
+  x_loc <- points[[1]]*x_length*runif(n_total, -1, 1)
+  y_loc <- points[[2]]*y_length*runif(n_total, -1, 1)
+  t_loc <- points[[3]]*t_length*runif(n_total, -1, 1)
+  # for (t in 1:length(tgrid)){
+  #   for(y in 1:length(ygrid)){
+  #     for(x in 1:length(xgrid)){
+  #       int <- intensity[[1]][x,y,t]
+  #       if(!is.na(int)){
+  #         Lambda <- grid_box_area*int
+  #         N[[1]][x,y,t] <- rpois(1, lambda = Lambda)
+  #         x_new <- runif(N[[1]][x,y,t], xgrid[x] - x_length, xgrid[x] + x_length)
+  #         y_new <- runif(N[[1]][x,y,t], ygrid[y] - y_length, ygrid[y] + y_length)
+  #         t_new <- runif(N[[1]][x,y,t], tgrid[t] - t_length, tgrid[t] + t_length)
+  #         x_loc <- c(x_loc, x_new)
+  #         y_loc <- c(y_loc, y_new)
+  #         t_loc <- c(t_loc, t_new)
+  #       }
+  #       
+  #     }
+  #   }
+  # }
+  mags <- rgpd(length(x_loc), scale=1, shape=0.1)
+  sim_data <- data.frame(X=x_loc, Y=y_loc, t=t_loc, M=mags)
+  return(sim_data)
+}
+grid_box_area = 500^2
+sim_PP(intensity, grid_box_area)
 

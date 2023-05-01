@@ -303,7 +303,9 @@ box.no2xyt<- function(n,len.x = 84,len.y = 99, minX = NA, minY = NA, minYr =NA){
   #Action: returns (x,y,t) centred spatially but at start of year
   #Output: vector of length 3. (x,y,t)
   a <-  (n %% (len.x*len.y))%%len.x
-  b <-  ((n %% (len.x*len.y))-a)/len.x +1
+  a[a==0] <- len.x
+  b <-  ceiling(n/len.x)%%len.y
+  b[b==0] <- len.y
   c <-  (n-a-(b-1)*len.x)/(len.x * len.y) +1
 
   x<- (a-1)*500 + minX
