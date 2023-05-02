@@ -84,9 +84,9 @@ sim_PP <- function(intensity, grid_box_area, x_length = 250, y_length = 250, t_l
   probs[is.na(probs)] <- 0
   grid_boxes <- sample( c(1:n_elements), n_total, prob=probs, replace = TRUE)
   points <- box.no2xyt(grid_boxes, minX = min(intensity$xgrid), minY = min(intensity$ygrid), minYr = min(intensity$tgrid))
-  x_loc <- points[[1]]*x_length*runif(n_total, -1, 1)
-  y_loc <- points[[2]]*y_length*runif(n_total, -1, 1)
-  t_loc <- points[[3]]*t_length*runif(n_total, -1, 1)
+  x_loc <- points[[1]] + x_length*runif(n_total, -1, 1)
+  y_loc <- points[[2]] + y_length*runif(n_total, -1, 1)
+  t_loc <- points[[3]] + t_length*runif(n_total, -1, 1)
   # for (t in 1:length(tgrid)){
   #   for(y in 1:length(ygrid)){
   #     for(x in 1:length(xgrid)){
@@ -110,5 +110,11 @@ sim_PP <- function(intensity, grid_box_area, x_length = 250, y_length = 250, t_l
   return(sim_data)
 }
 grid_box_area = 500^2
-sim_PP(intensity, grid_box_area)
+PP_sim1 <- sim_PP(intensity, grid_box_area)
 
+library(lubridate)
+date <- ymd(PP_sim1$t)
+
+Int_intensity <- sum(intensity[[1]], na.rm = TRUE)*grid_box_area
+n_total <- rpois(1, Int_intensity)
+max(intensity[[1]], na.rm = TRUE)
