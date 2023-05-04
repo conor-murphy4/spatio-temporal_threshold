@@ -68,13 +68,13 @@ make_cov_mats <- function(cov_df, df_t0, array_tlim = NULL, inpolymat = inPolyMa
 #' @param ... other parameters to pass to fields::image.plot()
 #'
 #' @return invisibly returns NULL
-plot_cov_mats <- function(cov_mats, xlab = "Easting (m)" ,ylab = "Northing (m)", cov_name = "covariate values", main = NULL, asp = 1, plot_slices = seq_along(cov_mats$tgrid), zlim = NULL, ...){
+plot_cov_mats_with_sim <- function(cov_mats,sim_points, xlab = "Easting (m)" ,ylab = "Northing (m)", cov_name = "covariate values", main = NULL, asp = 1, plot_slices = seq_along(cov_mats$tgrid), zlim = NULL, ...){
 
   if(is.null(zlim)){zlim = range(cov_mats[[1]][,,plot_slices], na.rm = TRUE)}
-
-  for (slice in plot_slices ){
+  i <- 1
+  for (slice in plot_slices[c(14,15,17:63)] ){
     if(is.null(main)){
-      title_text <- paste0(cov_name, " 01-01-", cov_mats$tgrid[slice])
+      title_text <- paste0(cov_name, " ", cov_mats$tgrid[slice])
     }
 
     fields::image.plot(
@@ -88,10 +88,37 @@ plot_cov_mats <- function(cov_mats, xlab = "Easting (m)" ,ylab = "Northing (m)",
         zlim = zlim,
         ...
     )
+    
+    plot_data <- sim_points[[i]]
+    #points(gron_outline$X, gron_outline$Y, asp=1, main=  paste0("Simulated events - ", Years[i]), xlab = "Easting(m)", ylab = "Northing(m)", pch=19, cex=0.5)
+    points(plot_data[,1], plot_data[,2], pch=19, cex=1.5, col="grey")
+    i <- i + 1
   }
   invisible(NULL)
 }
 
+plot_cov_mats <- function(cov_mats,sim_points, xlab = "Easting (m)" ,ylab = "Northing (m)", cov_name = "covariate values", main = NULL, asp = 1, plot_slices = seq_along(cov_mats$tgrid), zlim = NULL, ...){
+  
+  if(is.null(zlim)){zlim = range(cov_mats[[1]][,,plot_slices], na.rm = TRUE)}
+  for (slice in plot_slices ){
+    if(is.null(main)){
+      title_text <- paste0(cov_name, " 01-01-", cov_mats$tgrid[slice])
+    }
+    
+    fields::image.plot(
+      x = sort(cov_mats$xgrid),
+      y = sort(cov_mats$ygrid),
+      z = cov_mats[[1]][,,slice],
+      main = title_text,
+      xlab = xlab,
+      ylab = ylab,
+      asp = asp,
+      zlim = zlim,
+      ...
+    )
+  }
+  invisible(NULL)
+}
 
 #' Function to multiply two covariate arrays. Note that coordinates are inherited from the first argument.
 #'

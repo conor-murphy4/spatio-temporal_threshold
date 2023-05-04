@@ -1,3 +1,4 @@
+rm(list=ls())
 library(tidyverse)
 library(dplyr)
 
@@ -62,14 +63,11 @@ intensity<- replace_negatives_cov_mats(
 
 #Now, we need to isolate grid cubes, take intensity value, calculate no. of points 
 #within grid box by n=intensity[x,y,t]*volume and locate events uniformly across the cube
-# library(fields)
-# PLOT_PATH <- "Point processes/Intensity/"
-# pdf_path <- paste0(PLOT_PATH, "S4_intensity.pdf")
-# pdf(pdf_path, width = 7,height = 5)
-# plot_cov_mats(intensity, cov_name = "Intensity")
-# dev.off()
-
-
+library(fields)
+PLOT_PATH <- "Point processes/Simulations/Plots/PP_sim1.pdf"
+pdf(PLOT_PATH, width = 7,height = 5)
+plot_cov_mats_with_sim(intensity,PP_sim1_list,cov_name = "Intensity and Simulation")
+dev.off()
 
 #Simulating PP
 sim_PP <- function(intensity, grid_box_area, x_length = 250, y_length = 250, t_length = 0.5 ){
@@ -109,12 +107,41 @@ sim_PP <- function(intensity, grid_box_area, x_length = 250, y_length = 250, t_l
   sim_data <- data.frame(X=x_loc, Y=y_loc, t=t_loc, M=mags)
   return(sim_data)
 }
-grid_box_area = 500^2
+grid_box_area = 0.5^2
 PP_sim1 <- sim_PP(intensity, grid_box_area)
 
+#Taking year out of time
+PP_sim1$Year <- stringr::str_sub(PP_sim1$t,1,4)
+
+#Convert uniformly located times to dates
 library(lubridate)
 date <- ymd(PP_sim1$t)
 
 Int_intensity <- sum(intensity[[1]], na.rm = TRUE)*grid_box_area
 n_total <- rpois(1, Int_intensity)
 max(intensity[[1]], na.rm = TRUE)
+
+PP_sim1[PP_sim1$Year == 1995,]
+
+PP_matrix <- data.matrix(PP_sim1)
+
+PP_sim1_list <- list()
+Years <- sort(unique(PP_sim1$Year))
+for(i in 1:length(Years)){
+  current_year <- Years[i]
+  current_PP <- PP_sim1[PP_sim1$Year==current_year,1:2]
+  name <- paste0(current_year)
+  PP_sim1_list[[i]] <- as.matrix(current_PP)
+}
+names(PP_sim1_list) <- Years
+
+pdf_path <- "Point processes/Simulations/Plots/PP_sim1.pdf"
+pdf(pdf_path, width = 7,height = 5)
+for(i in 1:length(Years)){
+  plot_data <- PP_sim1_list[[i]]
+  plot(gron_outline$X, gron_outline$Y, asp=1, main=  paste0("Simulated events - ", Years[i]), xlab = "Easting(m)", ylab = "Northing(m)", pch=19, cex=0.5)
+  points(plot_data[,1], plot_data[,2], pch=19, col="blue", cex=1.5)
+}
+dev.off()
+
+
