@@ -31,8 +31,8 @@ inPolyVec <- readRDS("Point processes/Covariates/00_data/derived/inPoly/inPolyVe
 inPolyMat <- readRDS("Point processes/Covariates/00_data/derived/inPoly/inPolyMat.RDS")
 
 # incremental Coulomb Stress covariate
-ics_mats <- readRDS("Point processes/Covariates/00_data/derived/covariates/incremental_Coulomb_stress_mats.RDS")
-ics_mats <- subset_to_years_cov_mats(ics_mats, 1995, 2017)
+ics_mats <- readRDS("Point processes/Covariates/00_data/derived/covariates/ICS_1995_2025.RDS")
+ics_mats <- subset_to_years_cov_mats(ics_mats, 1995, 2022)
 
 #ics_rate_mats <- temporal_difference_cov_mats(ics_mats, "ics_rate")
 #ics_rate_mats <- replace_negatives_cov_mats(ics_rate_mats,replace = TRUE, replacement_value = 1e-6)
@@ -41,7 +41,7 @@ ics_mats <- subset_to_years_cov_mats(ics_mats, 1995, 2017)
 # Earthquake catalogue
 EqCat <- read.csv('Data/Events/2022-04-12_15-09-25_cat.csv', header = TRUE)
 colnames(EqCat)[1:5] <- c("Date", "Time_UT", "Easting", "Northing", "Magnitude" )
-Cat <- Catalogue(EC = EqCat, minMag = 1.5, maxDate = '2016-12-31')
+Cat <- Catalogue(EC = EqCat, minMag = 1.5, maxDate = '2022-12-31')
 rm(EqCat)
 
 

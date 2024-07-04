@@ -14,6 +14,18 @@ sigma <- Opt$par[3]
 
 #Covariates
 ics <- readRDS("Point processes/Covariates/00_data/derived/covariates/incremental_Coulomb_stress_mats.RDS")
+ICS_new <- readRDS("Point processes/Covariates/00_data/derived/covariates/ICS_1995_2025.RDS")
+par(mfrow=c(1,1))
+diff_ics <- ics$ics[,,45] - ICS_new$ics[,,45]
+image.plot(diff_ics)
+max(diff_ics, na.rm = TRUE)
+ICS_new$tgrid
+min(ICS_new$ics, na.rm = TRUE)
+max(ICS_new$ics, na.rm=TRUE)
+par(mfrow=c(2,2))
+t_year <- 2015
+image.plot(ics$xgrid, ics$ygrid,0.1*ics$ics[,,ics$tgrid==t_year], ylab="Northing (m)", xlab="Easting (m)", main="2015")
+image.plot(ICS_new$xgrid, ICS_new$ygrid, ICS_new$ics[,,ICS_new$tgrid==t_year], ylab="Northing (m)", xlab="Easting (m)", main="2015")
 
 #Events
 cat <- read.csv("Data/Events/2022-04-12_15-09-25_cat.csv")
@@ -27,7 +39,7 @@ geo <- read.csv("Data/Geophones/Geophone data/Geo_orig_post_process.csv")
 plot(cat$RD_X, cat$RD_Y)
 points(gron_outline$X, gron_outline$Y, pch=19, col="blue")
 points(geo$Xcoord, geo$Ycoord, pch=4, col="red", cex=1.5)
-
+plot(geo$Xcoord, geo$Ycoord)
 #Regular grid
 a <- seq(227750, 269750, by=500)
 b <- seq(565250, 615750, by=500)
@@ -60,7 +72,8 @@ intensity<- replace_negatives_cov_mats(
   replace = REPLACE_NEGATIVES,
   replacement_value = REPLACEMENT_VALUE)
 
-
+ICS_new <- ICS_1995_2025 
+ICS_old <- ics_mats
 #Now, we need to isolate grid cubes, take intensity value, calculate no. of points 
 #within grid box by n=intensity[x,y,t]*volume and locate events uniformly across the cube
 library(fields)
