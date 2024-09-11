@@ -1,12 +1,12 @@
-Geo <- read.csv("Data/Geophones/Geophone data/Geophone_rect.csv", header=T)
+Geo <- read.csv("Data/Geophones/Geophone_rect.csv", header=T)
 
 library(pracma)
 
 #Simple Polygon outline
-Gron_polygon <- read.csv('Data/Geophones/Geophone data/groningen_field_simple_polygon.csv', header=T)
+Gron_polygon <- read.csv('Data/Geophones/groningen_field_simple_polygon.csv', header=T)
 
 #Gron outline
-Gron_outline <- read.csv('Data/Geophones/Geophone data/Groningen_Field_outline.csv', header=T)
+Gron_outline <- read.csv('Data/Geophones/Groningen_Field_outline.csv', header=T)
 
 Geo_rect <- data.frame(X=Geo$Xcoord, Y=Geo$Ycoord)
 Geo_polygon<-inpolygon(Geo$Xcoord, Geo$Ycoord, Gron_outline$X, Gron_outline$Y)
@@ -113,8 +113,7 @@ text(loc3$X, loc3$Y, "3", cex=2, col=3)
 text(loc4$X, loc4$Y, "4", cex=2, col=4)
 
 plot(year, log(V_int), type='l', main="Integrated V", lwd=2)
-par(mfrow=c(1,1))
-plot(year, log(V_loc1),  lwd=2, type='l', ylim = c(12, 20), xlab="Year", ylab="log(V(x,t))")
+lines(year, log(V_loc1),  lwd=2, type='l', ylim = c(12, 20), xlab="Year", ylab="log(V(x,t))")
 lines(year, log(V_loc2),  lwd=2, col=2)
 lines(year, log(V_loc3),  lwd=2, col=3)
 lines(year, log(V_loc4), lwd=2, col=4)

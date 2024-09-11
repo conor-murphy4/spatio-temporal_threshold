@@ -375,8 +375,77 @@ GPD_LL <- function(par, z){
 }
 
 
-transform_to_exp <- function (y,sig, xi){
+transform_to_exp <- function (y, sig, xi){
   std_exp <- (1 / xi) * log( 1 + xi * (y/sig))  
   return(std_exp)
 }
 
+GPD_LL_given_third_nearest <- function(par, excess, thresh_par, third_nearest, min_dist = 0, max_dist = 33.782){
+  #Current min and max distances are conservative and should be updated based on Stephen's guidance
+  
+  if(length(par)!=2) stop("par must be a vector of length 2")
+  if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
+  if (!is.numeric(excess)) stop("excess must be a vector")
+  if (!is.numeric(third_nearest)) stop("third_nearest must be vector")
+  if(length(excess) != length(third_nearest)) stop("excess and third_nearest must be the same length")
+  if(length(min_dist)!=1) stop("min_dist must be a scalar")
+  if(length(max_dist)!=1) stop("max_dist must be a scalar")
+  
+  sigma<-par[1]
+  xi<-par[2]
+  
+  sigma_tilde <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*third_nearest)
+  
+  #Extra conditions to check for spatio-temporal model
+  sigma_max <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*max_dist)
+  sigma_min <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*min_dist)
+  
+  sigma_check <- c(sigma, sigma_min, sigma_max, sigma_tilde)
+  
+  if(all(sigma_check>0)){
+    if(abs(xi)<1e-10){
+      return(-sum(log(sigma_tilde))-sum(excess/sigma_tilde))
+    }
+    else{
+      if(all(1+(xi*excess)/sigma_tilde >0)){
+        return(-sum(log(sigma_tilde))-(1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
+      }
+      else{
+        return(-1e6)
+      }
+    }
+  }
+  else{
+    return(-1e7)
+  }
+}
+
+GPD_LL_step <- function(par, excess, thresh){
+  #Current min and max distances are conservative and should be updated based on Stephen's guidance
+  
+  if(length(par)!=2) stop("par must be a vector of length 2")
+  if(length(thresh)!=length(excess)) stop("excess and thresh must be the same length")
+  if (!is.numeric(excess)) stop("excess must be a vector")
+ 
+  sigma<-par[1]
+  xi<-par[2]
+  
+  sigma_tilde <- sigma + xi*(thresh)
+  
+  if(all(sigma_tilde>0)){
+    if(abs(xi)<1e-10){
+      return(-sum(log(sigma_tilde))-sum(excess/sigma_tilde))
+    }
+    else{
+      if(all(1+(xi*excess)/sigma_tilde >0)){
+        return(-sum(log(sigma_tilde))-(1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
+      }
+      else{
+        return(-1e6)
+      }
+    }
+  }
+  else{
+    return(-1e7)
+  }
+}

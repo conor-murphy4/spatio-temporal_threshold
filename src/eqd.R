@@ -77,3 +77,47 @@ eqd <- function(data, thresh, k = 100, m = 500){
   return(result)
 }
 
+eqd_exp <- function(data, thresh, k = 100, m = 500){
+  
+  # Check inputs are valid
+  if (!is.numeric(data)) stop("Data must be a vector")
+  if (!is.numeric(thresh)) stop("u to be tested needs to be a vector")
+  if (k <= 0 | k %% 1 != 0) stop("Number of bootstrapped samples must be a positive integer")
+  if (m <= 0 | m %% 1 != 0) stop("Number of equally spaced probabilities must be a positive integer")
+  
+  meandistances <- xis <- sigmas <- num_excess <- numeric(length(thresh))
+  for (i in 1:length(thresh)) {
+    u <- thresh[i]
+    excess <- data[data > u] - u
+    num_excess[i] <- length(excess)
+    if (num_excess[i] > 10) {
+      mle0 <- mean(excess)
+      init.fit <- optim(GPD_LL, z = excess, par = c(mle0,0.1), control = list(fnscale = -1))
+      xis[i] <- init.fit$par[[2]]
+      sigmas[i] <- init.fit$par[[1]]
+      distances <- numeric(k)
+      for (j in 1:k) {
+        X <- sample(excess, num_excess[i], replace = TRUE)
+        mle <- mean(X)
+        ifelse(xis[i] < 0, pars_init <-  c(mle, 0.1) ,pars_init <- c(sigmas[i], xis[i]) )
+        gpd.fit <- optim(GPD_LL, z = X, par = pars_init, control = list(fnscale = -1))
+        quants <- qexp((1:m) / (m + 1), rate = 1)
+        X_exp <- transform_to_exp(X, sig=gpd.fit$par[1], xi=gpd.fit$par[2])
+        distances[j] <- (1 / m) * sum(abs(quantile(X_exp, probs = (1:m) / (m+1)) - quants))
+      }
+      meandistances[i] <- mean(distances)
+    }
+    else{
+      meandistances[i] <- NA
+    }
+  }
+  chosen_index <- which.min(meandistances)
+  chosen_threshold <- thresh[chosen_index]
+  xi <- xis[chosen_index]
+  sigma <- sigmas[chosen_index]
+  len <- num_excess[chosen_index]
+  result <- list(thresh = chosen_threshold, par = c(sigma,xi), num_excess = len, dists = meandistances)
+  return(result)
+}
+
+
