@@ -9,7 +9,10 @@ source("src/eqd.R")
 mags <- gron_eq_cat$Magnitude
 
 thresholds <- quantile(mags, seq(0,0.95, by=0.01))
+set.seed(11111)
 const_thresh_fit <- eqd_exp(mags, thresh = thresholds, k=200)
+
+saveRDS(const_thresh_fit, "threshold_results/const_thresh_fit.rds")
 
 excesses_const <- mags[mags > const_thresh_fit$thresh] - const_thresh_fit$thresh
 
@@ -74,10 +77,13 @@ third_nearest_dist_3d <- gron_eq_cat$V_3d
 # sqrt_geo_sigma <- sqrt_geo_thresh_fit$par[1] + sqrt_geo_thresh_fit$par[2]*sqrt_geo_chosen_threshold[mags > sqrt_geo_chosen_threshold]
 
 #3d versions including depth in V function
-intercepts <- seq(0, 1.5, by=0.01)
-slopes <- seq(0,2.5, by=0.01)
+intercepts <- seq(0, 1.5, by=0.02)
+slopes <- seq(0,2.5, by=0.02)
 threshold_matrix <- as.matrix(expand.grid(intercepts, slopes))
+set.seed(11111)
 geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d, k=200, min_dist = min(third_nearest_dist_3d), max_dist = max(third_nearest_dist_3d))
+
+saveRDS(geo_thresh_fit_3d, "threshold_results/geo_thresh_fit_3d.rds")
 
 geo_chosen_threshold_3d <- geo_thresh_fit_3d$thresh[1] + geo_thresh_fit_3d$thresh[2]*third_nearest_dist_3d
 excesses_geo_3d <- mags[mags > geo_chosen_threshold_3d] - geo_chosen_threshold_3d[mags > geo_chosen_threshold_3d]
@@ -85,7 +91,10 @@ geo_sigma_3d <- geo_thresh_fit_3d$par[1] + geo_thresh_fit_3d$par[2]*geo_chosen_t
 
 log_third_nearest_dist_3d <- log(third_nearest_dist_3d)
 
+set.seed(11111)
 log_geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d, k=200, min_dist = min(log_third_nearest_dist_3d), max_dist = max(log_third_nearest_dist_3d))
+
+saveRDS(log_geo_thresh_fit_3d, "threshold_results/log_geo_thresh_fit_3d.rds")
 
 log_geo_chosen_threshold_3d <- log_geo_thresh_fit_3d$thresh[1] + log_geo_thresh_fit_3d$thresh[2]*log_third_nearest_dist_3d
 excesses_log_geo_3d <- mags[mags > log_geo_chosen_threshold_3d] - log_geo_chosen_threshold_3d[mags > log_geo_chosen_threshold_3d]
@@ -93,7 +102,10 @@ log_geo_sigma_3d <- log_geo_thresh_fit_3d$par[1] + log_geo_thresh_fit_3d$par[2]*
 
 sqrt_third_nearest_dist_3d <- sqrt(third_nearest_dist_3d)
 
+set.seed(11111)
 sqrt_geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d, k=200, min_dist = min(sqrt_third_nearest_dist_3d), max_dist = max(sqrt_third_nearest_dist_3d))
+
+saveRDS(sqrt_geo_thresh_fit_3d, "threshold_results/sqrt_geo_thresh_fit_3d.rds")
 
 sqrt_geo_chosen_threshold_3d <- sqrt_geo_thresh_fit_3d$thresh[1] + sqrt_geo_thresh_fit_3d$thresh[2]*sqrt_third_nearest_dist_3d
 excesses_sqrt_geo_3d <- mags[mags > sqrt_geo_chosen_threshold_3d] - sqrt_geo_chosen_threshold_3d[mags > sqrt_geo_chosen_threshold_3d]
