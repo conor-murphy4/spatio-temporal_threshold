@@ -16,23 +16,6 @@ saveRDS(const_thresh_fit, "threshold_results/const_thresh_fit.rds")
 
 excesses_const <- mags[mags > const_thresh_fit$thresh] - const_thresh_fit$thresh
 
-# Conservative constant threshold from Zak's work -------------------------
-conservative_threshold <- 1.45
-
-excesses_conservative <- mags[mags > conservative_threshold] - conservative_threshold
-
-conservative_thresh_fit <- optim(GPD_LL, par=c(mean(excesses_conservative), 0.1), z = excesses_conservative, control = list(fnscale=-1))
-
-# Piece-wise constant threshold according to index ------------------------
-
-u_h_length <- 1089
-piecewise_const_thresh <- c(rep(1.15, u_h_length), rep(0.76, length(mags) - u_h_length))
-
-excesses_piecewise_const <- mags[mags > piecewise_const_thresh] - piecewise_const_thresh[mags > piecewise_const_thresh]
-
-step_thresh_exc <- piecewise_const_thresh[mags > piecewise_const_thresh]
-
-piecewise_const_thresh_fit <- optim(GPD_LL_step, par=c(mean(excesses_piecewise_const), 0.1), excess = excesses_piecewise_const, thresh = step_thresh_exc, control = list(fnscale=-1))
 
 # Non-stationary GPD fit with threshold based on EQD given third_nearest_dist --------
 
@@ -80,36 +63,29 @@ third_nearest_dist_3d <- gron_eq_cat$V_3d
 intercepts <- seq(0, 1.5, by=0.02)
 slopes <- seq(0,2.5, by=0.02)
 threshold_matrix <- as.matrix(expand.grid(intercepts, slopes))
+
 set.seed(11111)
-geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d, k=200, min_dist = min(third_nearest_dist_3d), max_dist = max(third_nearest_dist_3d))
+# geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d, k=200, min_dist = min(third_nearest_dist_3d), max_dist = max(third_nearest_dist_3d))
+geo_thresh_fit_3d <- eqd_geo_unconstrained(data=mags, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d, k=200)
 
-saveRDS(geo_thresh_fit_3d, "threshold_results/geo_thresh_fit_3d.rds")
 
-geo_chosen_threshold_3d <- geo_thresh_fit_3d$thresh[1] + geo_thresh_fit_3d$thresh[2]*third_nearest_dist_3d
-excesses_geo_3d <- mags[mags > geo_chosen_threshold_3d] - geo_chosen_threshold_3d[mags > geo_chosen_threshold_3d]
-geo_sigma_3d <- geo_thresh_fit_3d$par[1] + geo_thresh_fit_3d$par[2]*geo_chosen_threshold_3d[mags > geo_chosen_threshold_3d]
+saveRDS(geo_thresh_fit_3d, "threshold_results/geo_thresh_fit_3d_unconstrained.rds")
 
 log_third_nearest_dist_3d <- log(third_nearest_dist_3d)
 
 set.seed(11111)
-log_geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d, k=200, min_dist = min(log_third_nearest_dist_3d), max_dist = max(log_third_nearest_dist_3d))
+# log_geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d, k=200, min_dist = min(log_third_nearest_dist_3d), max_dist = max(log_third_nearest_dist_3d))
+log_geo_thresh_fit_3d <- eqd_geo_unconstrained(data=mags, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d, k=200)
 
-saveRDS(log_geo_thresh_fit_3d, "threshold_results/log_geo_thresh_fit_3d.rds")
-
-log_geo_chosen_threshold_3d <- log_geo_thresh_fit_3d$thresh[1] + log_geo_thresh_fit_3d$thresh[2]*log_third_nearest_dist_3d
-excesses_log_geo_3d <- mags[mags > log_geo_chosen_threshold_3d] - log_geo_chosen_threshold_3d[mags > log_geo_chosen_threshold_3d]
-log_geo_sigma_3d <- log_geo_thresh_fit_3d$par[1] + log_geo_thresh_fit_3d$par[2]*log_geo_chosen_threshold_3d[mags > log_geo_chosen_threshold_3d]
+saveRDS(log_geo_thresh_fit_3d, "threshold_results/log_geo_thresh_fit_3d_unconstrained.rds")
 
 sqrt_third_nearest_dist_3d <- sqrt(third_nearest_dist_3d)
 
 set.seed(11111)
-sqrt_geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d, k=200, min_dist = min(sqrt_third_nearest_dist_3d), max_dist = max(sqrt_third_nearest_dist_3d))
+# sqrt_geo_thresh_fit_3d <- eqd_geo(data=mags, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d, k=200, min_dist = min(sqrt_third_nearest_dist_3d), max_dist = max(sqrt_third_nearest_dist_3d))
+sqrt_geo_thresh_fit_3d <- eqd_geo_unconstrained(data=mags, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d, k=200)
 
-saveRDS(sqrt_geo_thresh_fit_3d, "threshold_results/sqrt_geo_thresh_fit_3d.rds")
-
-sqrt_geo_chosen_threshold_3d <- sqrt_geo_thresh_fit_3d$thresh[1] + sqrt_geo_thresh_fit_3d$thresh[2]*sqrt_third_nearest_dist_3d
-excesses_sqrt_geo_3d <- mags[mags > sqrt_geo_chosen_threshold_3d] - sqrt_geo_chosen_threshold_3d[mags > sqrt_geo_chosen_threshold_3d]
-sqrt_geo_sigma_3d <- sqrt_geo_thresh_fit_3d$par[1] + sqrt_geo_thresh_fit_3d$par[2]*sqrt_geo_chosen_threshold_3d[mags > sqrt_geo_chosen_threshold_3d]
+saveRDS(sqrt_geo_thresh_fit_3d, "threshold_results/sqrt_geo_thresh_fit_3d_unconstrained.rds")
 
 # Visualising thresholds
 dev.new(width=30, height=10,noRStudioGD = TRUE)
@@ -160,7 +136,7 @@ sample_quantiles_exp_geo_3d <- quantile(exp_transformed_excesses_geo_3d, c(1:len
 sample_quantiles_exp_log_geo_3d <- quantile(exp_transformed_excesses_log_geo_3d, c(1:length(excesses_log_geo_3d))/(length(excesses_log_geo_3d)+1))
 sample_quantiles_exp_sqrt_geo_3d <- quantile(exp_transformed_excesses_sqrt_geo_3d, probs)
 
-model_quantiles_exp <- qexp(probs, rate = 1)
+# model_quantiles_exp <- qexp(probs, rate = 1)
 
 n_boot <- 200
 bootstrapped_model_quants_const <- matrix(NA, nrow = n_boot, ncol= length(excesses_const))
