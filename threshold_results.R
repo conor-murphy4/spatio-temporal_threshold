@@ -8,9 +8,9 @@ sqrt_third_nearest_dist_3d <- sqrt(third_nearest_dist_3d)
 
 #Fitted thresholds
 const_thresh_fit <- readRDS("threshold_results/const_thresh_fit.rds")
-geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d.rds")
-log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d.rds")
-sqrt_geo_thresh_fit_3d <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d.rds")
+geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d_unconstrained.rds")
+log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d_unconstrained.rds")
+sqrt_geo_thresh_fit_3d <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d_unconstrained.rds")
 
 # Conservative constant threshold from Zak's work -------------------------
 conservative_threshold <- 1.45
@@ -33,6 +33,8 @@ step_thresh_exc <- piecewise_const_thresh[mags > piecewise_const_thresh]
 
 piecewise_const_thresh_fit <- optim(GPD_LL_step, par=c(mean(excesses_piecewise_const), 0.1), excess = excesses_piecewise_const, thresh = step_thresh_exc, control = list(fnscale=-1), hessian = T)
 
+pc_sigma_excess <- piecewise_const_thresh_fit$par[1] + piecewise_const_thresh_fit$par[2]*step_thresh_exc
+
 (scale_ci_pc <- piecewise_const_thresh_fit$par[1] + c(-1.96,1.96)*sqrt(diag(solve(-piecewise_const_thresh_fit$hessian)))[1])
 (shape_ci_pc <- piecewise_const_thresh_fit$par[2] + c(-1.96,1.96)*sqrt(diag(solve(-piecewise_const_thresh_fit$hessian)))[2])
 
@@ -50,7 +52,7 @@ third_nearest_dist_excess <- third_nearest_dist_3d[mags > geo_chosen_threshold_3
 excesses_geo_3d <- mags[mags > geo_chosen_threshold_3d] - geo_chosen_threshold_3d[mags > geo_chosen_threshold_3d]
 geo_sigma_3d <- geo_thresh_fit_3d$par[1] + geo_thresh_fit_3d$par[2]*geo_chosen_threshold_3d[mags > geo_chosen_threshold_3d]
 
-geo_thresh_opt_fit <- optim(GPD_LL_given_third_nearest, thresh_par=geo_thresh_fit_3d$thresh_par , par=c(mean(excesses_geo_3d), 0.1), excess = excesses_geo_3d, third_nearest = third_nearest_dist_excess, control = list(fnscale=-1), hessian = T, min_dist=min(third_nearest_dist_3d), max_dist=max(third_nearest_dist_3d))
+geo_thresh_opt_fit <- optim(GPD_LL_given_third_nearest_unconstrained, thresh_par=geo_thresh_fit_3d$thresh_par , par=c(mean(excesses_geo_3d), 0.1), excess = excesses_geo_3d, third_nearest = third_nearest_dist_excess, control = list(fnscale=-1), hessian = T)#, min_dist=min(third_nearest_dist_3d), max_dist=max(third_nearest_dist_3d))
 
 (scale_ci_geo <- geo_thresh_opt_fit$par[1] + c(-1.96,1.96)*sqrt(diag(solve(-geo_thresh_opt_fit$hessian)))[1])
 (shape_ci_geo <- geo_thresh_opt_fit$par[2] + c(-1.96,1.96)*sqrt(diag(solve(-geo_thresh_opt_fit$hessian)))[2])
@@ -99,7 +101,7 @@ legend("topright", legend=c("Threshold on V_3d", "Threshold on log(V_3d)", "Thre
 
 exp_transformed_excesses_const <- transform_to_exp(excesses_const, sig = const_thresh_fit$par[1], xi = const_thresh_fit$par[2])
 exp_transformed_excesses_conservative <- transform_to_exp(excesses_conservative, sig = conservative_thresh_fit$par[1], xi = conservative_thresh_fit$par[2])
-exp_transformed_excesses_piecewise_const <- transform_to_exp(excesses_piecewise_const, sig = piecewise_const_thresh_fit$par[1], xi = piecewise_const_thresh_fit$par[2])
+exp_transformed_excesses_piecewise_const <- transform_to_exp(excesses_piecewise_const, sig = pc_sigma_excess, xi = piecewise_const_thresh_fit$par[2])
 exp_transformed_excesses_geo_3d <- transform_to_exp(excesses_geo_3d, sig = geo_sigma_3d, xi = geo_thresh_fit_3d$par[2])
 exp_transformed_excesses_log_geo_3d <- transform_to_exp(excesses_log_geo_3d, sig = log_geo_sigma_3d, xi = log_geo_thresh_fit_3d$par[2])
 exp_transformed_excesses_sqrt_geo_3d <- transform_to_exp(excesses_sqrt_geo_3d, sig = sqrt_geo_sigma_3d, xi = sqrt_geo_thresh_fit_3d$par[2])
@@ -216,6 +218,10 @@ log_geo_chosen_threshold_3d_after <- log_geo_thresh_fit_3d$thresh_par[1] + log_g
 sqrt_geo_chosen_threshold_3d_before <- sqrt_geo_thresh_fit_3d$thresh[1] + sqrt_geo_thresh_fit_3d$thresh[2]*sqrt_third_nearest_dist_3d_before
 sqrt_geo_chosen_threshold_3d_after <- sqrt_geo_thresh_fit_3d$thresh[1] + sqrt_geo_thresh_fit_3d$thresh[2]*sqrt_third_nearest_dist_3d_after
 
+#Sigmas
+pc_sigma_before <- piecewise_const_thresh_fit$par[1] + piecewise_const_thresh_fit$par[2]*pc_thresh_before[mags_before > pc_thresh_before]
+pc_sigma_after <- piecewise_const_thresh_fit$par[1] + piecewise_const_thresh_fit$par[2]*pc_thresh_after[mags_after > pc_thresh_after]
+
 geo_sigma_3d_before <- geo_thresh_fit_3d$par[1] + geo_thresh_fit_3d$par[2]*geo_chosen_threshold_3d_before[mags_before > geo_chosen_threshold_3d_before]
 geo_sigma_3d_after <- geo_thresh_fit_3d$par[1] + geo_thresh_fit_3d$par[2]*geo_chosen_threshold_3d_after[mags_after > geo_chosen_threshold_3d_after]
 
@@ -247,14 +253,14 @@ excesses_sqrt_geo_3d_after <- mags_after[mags_after > sqrt_geo_chosen_threshold_
 #QQplots
 exp_transformed_excesses_const_before <- transform_to_exp(excesses_const_before, sig = const_thresh_fit$par[1], xi = const_thresh_fit$par[2])
 exp_transformed_excesses_conservative_before <- transform_to_exp(excesses_conservative_before, sig = conservative_thresh_fit$par[1], xi = conservative_thresh_fit$par[2])
-exp_transformed_excesses_pc_before <- transform_to_exp(excesses_pc_before, sig = piecewise_const_thresh_fit$par[1], xi = piecewise_const_thresh_fit$par[2])
+exp_transformed_excesses_pc_before <- transform_to_exp(excesses_pc_before, sig = pc_sigma_before, xi = piecewise_const_thresh_fit$par[2])
 exp_transformed_excesses_geo_3d_before <- transform_to_exp(excesses_geo_3d_before, sig = geo_sigma_3d_before, xi = geo_thresh_fit_3d$par[2])
 exp_transformed_excesses_log_geo_3d_before <- transform_to_exp(excesses_log_geo_3d_before, sig = log_geo_sigma_3d_before, xi = log_geo_thresh_fit_3d$par[2])
 exp_transformed_excesses_sqrt_geo_3d_before <- transform_to_exp(excesses_sqrt_geo_3d_before, sig = sqrt_geo_sigma_3d_before, xi = sqrt_geo_thresh_fit_3d$par[2])
 
 exp_transformed_excesses_const_after <- transform_to_exp(excesses_const_after, sig = const_thresh_fit$par[1], xi = const_thresh_fit$par[2])
 exp_transformed_excesses_conservative_after <- transform_to_exp(excesses_conservative_after, sig = conservative_thresh_fit$par[1], xi = conservative_thresh_fit$par[2])
-exp_transformed_excesses_pc_after <- transform_to_exp(excesses_pc_after, sig = piecewise_const_thresh_fit$par[1], xi = piecewise_const_thresh_fit$par[2])
+exp_transformed_excesses_pc_after <- transform_to_exp(excesses_pc_after, sig = pc_sigma_after, xi = piecewise_const_thresh_fit$par[2])
 exp_transformed_excesses_geo_3d_after <- transform_to_exp(excesses_geo_3d_after, sig = geo_sigma_3d_after, xi = geo_thresh_fit_3d$par[2])
 exp_transformed_excesses_log_geo_3d_after <- transform_to_exp(excesses_log_geo_3d_after, sig = log_geo_sigma_3d_after, xi = log_geo_thresh_fit_3d$par[2])
 exp_transformed_excesses_sqrt_geo_3d_after <- transform_to_exp(excesses_sqrt_geo_3d_after, sig = sqrt_geo_sigma_3d_after, xi = sqrt_geo_thresh_fit_3d$par[2])
@@ -424,10 +430,6 @@ plot(model_quantiles_exp, sample_quantiles_exp_sqrt_geo_3d_after, main = "EQD sq
 lines(model_quantiles_exp, upper_tolerance_int_sqrt_geo_3d_after, lty="dashed", lwd=2, col="red")
 lines(model_quantiles_exp, lower_tolerance_int_sqrt_geo_3d_after, lty="dashed", lwd=2, col="red")
 abline(a=0, b=1, lwd=2, col="grey")
-
-
-
-
 
 
 # Helper function to calculate quantiles and bootstrapped confidence intervals

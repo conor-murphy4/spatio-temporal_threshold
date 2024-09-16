@@ -1,4 +1,4 @@
-gron_eq_cat <- read.csv("Data/Events/unrounded_after_geophone_start_in_polygon_with_V_3d.csv", header=T)
+gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
 
 #All commented code could possibly be remioved.. This is code related to 2D version of V
 
