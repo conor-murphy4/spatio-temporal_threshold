@@ -427,8 +427,8 @@ GPD_LL_given_third_nearest_unconstrained <- function(par, excess, thresh_par, th
   if (!is.numeric(excess)) stop("excess must be a vector")
   if (!is.numeric(third_nearest)) stop("third_nearest must be vector")
   if(length(excess) != length(third_nearest)) stop("excess and third_nearest must be the same length")
-  if(length(min_dist)!=1) stop("min_dist must be a scalar")
-  if(length(max_dist)!=1) stop("max_dist must be a scalar")
+  #if(length(min_dist)!=1) stop("min_dist must be a scalar")
+  #if(length(max_dist)!=1) stop("max_dist must be a scalar")
   
   sigma<-par[1]
   xi<-par[2]
