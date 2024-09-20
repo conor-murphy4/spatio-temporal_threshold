@@ -107,41 +107,41 @@ threshold_matrix <- as.matrix(expand.grid(intercepts, slopes))
 
 #Before
 set.seed(11111)
-# geo_thresh_fit_3d_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_before, k=200, min_dist = min(third_nearest_dist_3d_before), max_dist = max(third_nearest_dist_3d_before))
-geo_thresh_fit_3d_before <- eqd_geo_unconstrained(data=mags_before, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_before, k=200)
+geo_thresh_fit_3d_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_before, k=200, min_dist = min(third_nearest_dist_3d_before), max_dist = max(third_nearest_dist_3d_before))
+# geo_thresh_fit_3d_before <- eqd_geo_unconstrained(data=mags_before, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_before, k=200)
 
-saveRDS(geo_thresh_fit_3d_before, "threshold_results/geo_thresh_fit_3d_before_unconstrained.rds")
-
-set.seed(11111)
-# log_geo_thresh_fit_3d_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_before, k=200, min_dist = min(log_third_nearest_dist_3d_before), max_dist = max(log_third_nearest_dist_3d_before))
-log_geo_thresh_fit_3d_before <- eqd_geo_unconstrained(data=mags_before, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_before, k=200)
-
-saveRDS(log_geo_thresh_fit_3d_before, "threshold_results/log_geo_thresh_fit_3d_before_unconstrained.rds")
+saveRDS(geo_thresh_fit_3d_before, "threshold_results/geo_thresh_fit_3d_before.rds")
 
 set.seed(11111)
-# sqrt_geo_thresh_fit_3d_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d_before, k=200, min_dist = min(sqrt_third_nearest_dist_3d_before), max_dist = max(sqrt_third_nearest_dist_3d_before))
-sqrt_geo_thresh_fit_3d_before <- eqd_geo_unconstrained(data=mags_before, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d_before, k=200)
+log_geo_thresh_fit_3d_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_before, k=200, min_dist = min(log_third_nearest_dist_3d_before), max_dist = max(log_third_nearest_dist_3d_before))
+# log_geo_thresh_fit_3d_before <- eqd_geo_unconstrained(data=mags_before, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_before, k=200)
 
-saveRDS(sqrt_geo_thresh_fit_3d_before, "threshold_results/sqrt_geo_thresh_fit_3d_before_unconstrained.rds")
+saveRDS(log_geo_thresh_fit_3d_before, "threshold_results/log_geo_thresh_fit_3d_before.rds")
+
+set.seed(11111)
+sqrt_geo_thresh_fit_3d_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d_before, k=200, min_dist = min(sqrt_third_nearest_dist_3d_before), max_dist = max(sqrt_third_nearest_dist_3d_before))
+# sqrt_geo_thresh_fit_3d_before <- eqd_geo_unconstrained(data=mags_before, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d_before, k=200)
+
+saveRDS(sqrt_geo_thresh_fit_3d_before, "threshold_results/sqrt_geo_thresh_fit_3d_before.rds")
 
 #After
 set.seed(11111)
-# geo_thresh_fit_3d_after <- eqd_geo(data=mags_after, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_after, k=200, min_dist = min(third_nearest_dist_3d_after), max_dist = max(third_nearest_dist_3d_after))
-geo_thresh_fit_3d_after <- eqd_geo_unconstrained(data=mags_after, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_after, k=200)
+geo_thresh_fit_3d_after <- eqd_geo(data=mags_after, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_after, k=200, min_dist = min(third_nearest_dist_3d_after), max_dist = max(third_nearest_dist_3d_after))
+# geo_thresh_fit_3d_after <- eqd_geo_unconstrained(data=mags_after, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_after, k=200)
 
-saveRDS(geo_thresh_fit_3d_after, "threshold_results/geo_thresh_fit_3d_after_unconstrained.rds")
-
-set.seed(11111)
-# log_geo_thresh_fit_3d_after <- eqd_geo(data=mags_after, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_after, k=200, min_dist = min(log_third_nearest_dist_3d_after), max_dist = max(log_third_nearest_dist_3d_after))
-log_geo_thresh_fit_3d_after <- eqd_geo_unconstrained(data=mags_after, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_after, k=200)
-
-saveRDS(log_geo_thresh_fit_3d_after, "threshold_results/log_geo_thresh_fit_3d_after_unconstrained.rds")
+saveRDS(geo_thresh_fit_3d_after, "threshold_results/geo_thresh_fit_3d_after.rds")
 
 set.seed(11111)
-# sqrt_geo_thresh_fit_3d_after <- eqd_geo(data=mags_after, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d_after, k=200, min_dist = min(sqrt_third_nearest_dist_3d_after), max_dist = max(sqrt_third_nearest_dist_3d_after))
-sqrt_geo_thresh_fit_3d_after <- eqd_geo_unconstrained(data=mags_after, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d_after, k=200)
+log_geo_thresh_fit_3d_after <- eqd_geo(data=mags_after, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_after, k=200, min_dist = min(log_third_nearest_dist_3d_after), max_dist = max(log_third_nearest_dist_3d_after))
+# log_geo_thresh_fit_3d_after <- eqd_geo_unconstrained(data=mags_after, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_after, k=200)
 
-saveRDS(sqrt_geo_thresh_fit_3d_after, "threshold_results/sqrt_geo_thresh_fit_3d_after_unconstrained.rds")
+saveRDS(log_geo_thresh_fit_3d_after, "threshold_results/log_geo_thresh_fit_3d_after.rds")
+
+set.seed(11111)
+sqrt_geo_thresh_fit_3d_after <- eqd_geo(data=mags_after, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d_after, k=200, min_dist = min(sqrt_third_nearest_dist_3d_after), max_dist = max(sqrt_third_nearest_dist_3d_after))
+# sqrt_geo_thresh_fit_3d_after <- eqd_geo_unconstrained(data=mags_after, thresh = threshold_matrix, third_nearest_distance = sqrt_third_nearest_dist_3d_after, k=200)
+
+saveRDS(sqrt_geo_thresh_fit_3d_after, "threshold_results/sqrt_geo_thresh_fit_3d_after.rds")
 
 # Visualising thresholds
 dev.new(width=30, height=10,noRStudioGD = TRUE)
