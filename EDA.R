@@ -6,12 +6,18 @@ gron_outline <- read.csv('Data/Geophones/Groningen_Field_outline.csv', header=T)
 gron_polygon <- read.table('Data/Geophones/polygon_for_groningen_earthquakes.txt', header=T)
 geophones <- read.csv("Data/Geophones/Geophones_processed_03-07-2024.csv", header=T, row.names = 1)
 gron_eq_cat_all_netherlands <- read.csv("Data/Events/unrounded_after_geophone_start.csv", header=T, row.names = 1)
-gron_eq_cat <- read.csv("Data/Events/unrounded_after_geophone_start_in_polygon_with_V_3d.csv", header=T)
+gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
+gron_eq_cat_all <- read.csv("Data/Events/unrounded_after_geophone_start_in_polygon_with_V_3d.csv", header=T)
 gron_eq_cat_old <- read.csv("Data/Events/2022-04-12_15-09-25_cat.csv", header=T)
 
+included_geos <- what_geos(gron_eq_cat, geophones)
 #Restricting EQs to within the groningen polygon
 # gron_eq_cat_in_polygon <- gron_eq_cat[inpolygon(gron_eq_cat$Easting, gron_eq_cat$Northing, gron_polygon$POINT_X, gron_polygon$POINT_Y),]
 # write.csv(gron_eq_cat_in_polygon, "Data/Events/unrounded_after_geophone_start_in_polygon.csv")
+
+#Restricting EQs past 1995
+# gron_eq_cat_past_1995 <- gron_eq_cat[as.Date(gron_eq_cat$Date) > as.Date("1995-01-01"),]
+# write.csv(gron_eq_cat_past_1995, "Data/Events/unrounded_after_1995_in_polygon.csv")
 
 #Comparing old and new datasets
 
@@ -65,17 +71,19 @@ plot(min_V_per_year$Group.1, min_V_per_year$x, xlab="Year", ylab="Minimum V", ma
 points(min_V_per_year$Group.1, min_V_per_year$x, col="red",pch=19)
 
 #Exploratory plots of relationship between magnitudes and V
-dev.new(width=30, height=20,noRStudioGD = TRUE)
-par(mfrow=c(2,3),bg='transparent')
-plot(gron_eq_cat$V, gron_eq_cat$Magnitude, xlab = "V", ylab = "Magnitude")
-plot(log(gron_eq_cat$V), gron_eq_cat$Magnitude, xlab = "log(V)", ylab = "Magnitude")
-plot(sqrt(gron_eq_cat$V), gron_eq_cat$Magnitude, xlab = "sqrt(V)", ylab = "Magnitude")
+dev.new(width=30, height=10,noRStudioGD = TRUE)
+par(mfrow=c(1,3),bg='transparent')
+# plot(gron_eq_cat$V, gron_eq_cat$Magnitude, xlab = "V", ylab = "Magnitude")
+# plot(log(gron_eq_cat$V), gron_eq_cat$Magnitude, xlab = "log(V)", ylab = "Magnitude")
+# plot(sqrt(gron_eq_cat$V), gron_eq_cat$Magnitude, xlab = "sqrt(V)", ylab = "Magnitude")
 
 #Relationship between V_3d and Magnitude
 plot(gron_eq_cat$V_3d, gron_eq_cat$Magnitude, xlab = "V_3d", ylab = "Magnitude")
+points(gron_eq_cat$V_3d, geo_chosen_threshold_3d, col="red", pch=19)
 plot(log(gron_eq_cat$V_3d), gron_eq_cat$Magnitude, xlab = "log(V_3d)", ylab = "Magnitude")
+points(log(gron_eq_cat$V_3d), log_geo_chosen_threshold_3d, col="red", pch=19)
 plot(sqrt(gron_eq_cat$V_3d), gron_eq_cat$Magnitude, xlab = "sqrt(V_3d)", ylab = "Magnitude")
-
+points(sqrt(gron_eq_cat$V_3d), sqrt_geo_chosen_threshold_3d, col="red", pch=19)
 #Splitting gas field in two regions
 #Plotting
 # dev.new(width=10, height=10,noRStudioGD = TRUE)
