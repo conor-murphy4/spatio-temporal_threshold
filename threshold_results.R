@@ -1,82 +1,52 @@
 source("src/helper_functions.R")
 
-gron_eq_cat <- read.csv("Data/Events/unrounded_after_geophone_start_in_polygon_with_V_3d.csv", header=T)
+gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
 mags <- gron_eq_cat$Magnitude
+third_nearest_dist <- gron_eq_cat$V
+log_third_nearest_dist <- log(third_nearest_dist)
+sqrt_third_nearest_dist <- sqrt(third_nearest_dist)
 third_nearest_dist_3d <- gron_eq_cat$V_3d
 log_third_nearest_dist_3d <- log(third_nearest_dist_3d)
 sqrt_third_nearest_dist_3d <- sqrt(third_nearest_dist_3d)
 
 #Fitted thresholds
-const_thresh_fit <- readRDS("threshold_results/const_thresh_fit.rds")
-geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d_unconstrained.rds")
-log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d_unconstrained.rds")
-sqrt_geo_thresh_fit_3d <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d_unconstrained.rds")
+eqd_thresh_fit <- readRDS("threshold_results/const_thresh_fit.rds")
+
+geo_thresh_fit <- readRDS("threshold_results/geo_thresh_fit_2d.rds")
+log_geo_thresh_fit <- readRDS("threshold_results/log_geo_thresh_fit.rds")
+sqrt_geo_thresh_fit <- readRDS("threshold_results/sqrt_geo_thresh_fit.rds")
+
+geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d.rds")
+log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d.rds")
+sqrt_geo_thresh_fit_3d <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d.rds")
+
+geo_thresh_fit_3d_un <- readRDS("threshold_results/geo_thresh_fit_3d_unconstrained.rds")
+log_geo_thresh_fit_3d_un <- readRDS("threshold_results/log_geo_thresh_fit_3d_unconstrained.rds")
+sqrt_geo_thresh_fit_3d_un <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d_unconstrained.rds")
 
 # Conservative constant threshold from Zak's work -------------------------
-conservative_threshold <- 1.45
+conservative_threshold <- rep(1.45, length(mags))
 
-excesses_conservative <- mags[mags > conservative_threshold] - conservative_threshold
-
-conservative_thresh_fit <- optim(GPD_LL, par=c(mean(excesses_conservative), 0.1), z = excesses_conservative, control = list(fnscale=-1), hessian = TRUE)
-
-(scale_ci_conserv <- conservative_thresh_fit$par[1] + c(-1.96,1.96)*sqrt(diag(solve(-conservative_thresh_fit$hessian)))[1])
-(shape_ci_conserv <- conservative_thresh_fit$par[2] + c(-1.96,1.96)*sqrt(diag(solve(-conservative_thresh_fit$hessian)))[2])
+get_par_ests_step(mags, conservative_threshold)
 
 # Piece-wise constant threshold according to index ------------------------
 
-u_h_length <- 1089
+u_h_length <- which(gron_eq_cat$Date == as.Date("2015-01-06"))[1]
 piecewise_const_thresh <- c(rep(1.15, u_h_length), rep(0.76, length(mags) - u_h_length))
 
-excesses_piecewise_const <- mags[mags > piecewise_const_thresh] - piecewise_const_thresh[mags > piecewise_const_thresh]
-
-step_thresh_exc <- piecewise_const_thresh[mags > piecewise_const_thresh]
-
-piecewise_const_thresh_fit <- optim(GPD_LL_step, par=c(mean(excesses_piecewise_const), 0.1), excess = excesses_piecewise_const, thresh = step_thresh_exc, control = list(fnscale=-1), hessian = T)
-
-pc_sigma_excess <- piecewise_const_thresh_fit$par[1] + piecewise_const_thresh_fit$par[2]*step_thresh_exc
-
-(scale_ci_pc <- piecewise_const_thresh_fit$par[1] + c(-1.96,1.96)*sqrt(diag(solve(-piecewise_const_thresh_fit$hessian)))[1])
-(shape_ci_pc <- piecewise_const_thresh_fit$par[2] + c(-1.96,1.96)*sqrt(diag(solve(-piecewise_const_thresh_fit$hessian)))[2])
+get_par_ests_step(mags, piecewise_const_thresh)
 
 #Resulting thresholds, excesses and sigma(x,t) --------------------------------
-excesses_const <- mags[mags > const_thresh_fit$thresh] - const_thresh_fit$thresh
+eqd_threshold <- rep(const_thresh_fit$thresh, length(mags))
 
-const_opt_fit <- optim(GPD_LL, par=c(mean(excesses_const), 0.1), z = excesses_const, control = list(fnscale=-1), hessian = TRUE)
-
-(scale_ci_const <- const_opt_fit$par[1] + c(-1.96,1.96)*sqrt(diag(solve(-const_opt_fit$hessian)))[1])
-(shape_ci_const <- const_opt_fit$par[2] + c(-1.96,1.96)*sqrt(diag(solve(-const_opt_fit$hessian)))[2])
+get_par_ests_step(mags, eqd_threshold)
 
 #Threshold based on V
-geo_chosen_threshold_3d <- geo_thresh_fit_3d$thresh[1] + geo_thresh_fit_3d$thresh[2]*third_nearest_dist_3d
-third_nearest_dist_excess <- third_nearest_dist_3d[mags > geo_chosen_threshold_3d]
-excesses_geo_3d <- mags[mags > geo_chosen_threshold_3d] - geo_chosen_threshold_3d[mags > geo_chosen_threshold_3d]
-geo_sigma_3d <- geo_thresh_fit_3d$par[1] + geo_thresh_fit_3d$par[2]*geo_chosen_threshold_3d[mags > geo_chosen_threshold_3d]
+get_par_ests_geo(mags, geo_thresh_fit_3d, third_nearest_dist_3d)
 
-geo_thresh_opt_fit <- optim(GPD_LL_given_third_nearest_unconstrained, thresh_par=geo_thresh_fit_3d$thresh_par , par=c(mean(excesses_geo_3d), 0.1), excess = excesses_geo_3d, third_nearest = third_nearest_dist_excess, control = list(fnscale=-1), hessian = T)#, min_dist=min(third_nearest_dist_3d), max_dist=max(third_nearest_dist_3d))
+get_par_ests_geo(mags, log_geo_thresh_fit_3d, log_third_nearest_dist_3d)
 
-(scale_ci_geo <- geo_thresh_opt_fit$par[1] + c(-1.96,1.96)*sqrt(diag(solve(-geo_thresh_opt_fit$hessian)))[1])
-(shape_ci_geo <- geo_thresh_opt_fit$par[2] + c(-1.96,1.96)*sqrt(diag(solve(-geo_thresh_opt_fit$hessian)))[2])
-
-log_geo_chosen_threshold_3d <- log_geo_thresh_fit_3d$thresh_par[1] + log_geo_thresh_fit_3d$thresh_par[2]*log_third_nearest_dist_3d
-log_third_nearest_dist_excess <- log_third_nearest_dist_3d[mags > log_geo_chosen_threshold_3d]
-excesses_log_geo_3d <- mags[mags > log_geo_chosen_threshold_3d] - log_geo_chosen_threshold_3d[mags > log_geo_chosen_threshold_3d]
-log_geo_sigma_3d <- log_geo_thresh_fit_3d$par[1] + log_geo_thresh_fit_3d$par[2]*log_geo_chosen_threshold_3d[mags > log_geo_chosen_threshold_3d]
-
-log_geo_thresh_opt_fit <- optim(GPD_LL_given_third_nearest, thresh_par=log_geo_thresh_fit_3d$thresh_par , par=c(mean(excesses_log_geo_3d), 0.1), excess = excesses_log_geo_3d, third_nearest = log_third_nearest_dist_excess, control = list(fnscale=-1), hessian = T, min_dist=min(log_third_nearest_dist_3d), max_dist=max(log_third_nearest_dist_3d))
-
-(scale_ci_log_geo <- log_geo_thresh_opt_fit$par[1] + c(-1.96,1.96)*sqrt(diag(solve(-log_geo_thresh_opt_fit$hessian)))[1])
-(shape_ci_log_geo <- log_geo_thresh_opt_fit$par[2] + c(-1.96,1.96)*sqrt(diag(solve(-log_geo_thresh_opt_fit$hessian)))[2])
-
-sqrt_geo_chosen_threshold_3d <- sqrt_geo_thresh_fit_3d$thresh[1] + sqrt_geo_thresh_fit_3d$thresh[2]*sqrt_third_nearest_dist_3d
-sqrt_third_nearest_dist_excess <- sqrt_third_nearest_dist_3d[mags > sqrt_geo_chosen_threshold_3d]
-excesses_sqrt_geo_3d <- mags[mags > sqrt_geo_chosen_threshold_3d] - sqrt_geo_chosen_threshold_3d[mags > sqrt_geo_chosen_threshold_3d]
-sqrt_geo_sigma_3d <- sqrt_geo_thresh_fit_3d$par[1] + sqrt_geo_thresh_fit_3d$par[2]*sqrt_geo_chosen_threshold_3d[mags > sqrt_geo_chosen_threshold_3d]
-
-sqrt_geo_thresh_opt_fit <- optim(GPD_LL_given_third_nearest, thresh_par=sqrt_geo_thresh_fit_3d$thresh_par , par=c(mean(excesses_sqrt_geo_3d), 0.1), excess = excesses_sqrt_geo_3d, third_nearest = sqrt_third_nearest_dist_excess, control = list(fnscale=-1), hessian = T, min_dist=min(sqrt_third_nearest_dist_3d), max_dist=max(sqrt_third_nearest_dist_3d))
-
-(scale_ci_sqrt_geo <- sqrt_geo_thresh_opt_fit$par[1] + c(-1.96,1.96)*sqrt(diag(solve(-sqrt_geo_thresh_opt_fit$hessian)))[1])
-(shape_ci_sqrt_geo <- sqrt_geo_thresh_opt_fit$par[2] + c(-1.96,1.96)*sqrt(diag(solve(-sqrt_geo_thresh_opt_fit$hessian)))[2])
-
+get_par_ests_geo(mags, sqrt_geo_thresh_fit_3d, sqrt_third_nearest_dist_3d)
 
 # Visualising thresholds
 
@@ -530,13 +500,47 @@ ggplot(image_plot_df, aes(x=a, y=b, fill=sqrtv_dists)) + geom_tile() + scale_fil
 library(ggplot2)
 
 
+# Investigating increase in minimum V after 2015 by comparing geophones at early and later dates
+
+dev.new(height=20, width=20, noRStudioGD = TRUE)
+par(mfrow=c(1,1), bg='transparent')
+
+check_dates <- gron_eq_cat$Date[50:750]
+geo_start <- geo_current(geophones, check_dates[1])
+plot(geo_start$X, geo_start$Y, pch=19, col="black")
+
+opacity <- seq(0.01,0.99, length.out = length(check_dates))
+for(i in 1:length(check_dates)){
+  current_geophones <- geo_current_adj(used_geophones, check_dates[i])
+  plot(current_geophones$X, current_geophones$Y, pch=19)
+}
+points(gron_outline$X, gron_outline$Y, pch=19, col="red", cex=0.3)
 
 
 
+used_geophones <- what_geos(gron_eq_cat, geophones)
+used_geophones[used_geophones$Start_date <= check_dates[50] & used_geophones$End_date >= check_dates[750],]
 
+geo_current_adj <- function(geophones, date){
+  indices_current <- which(geophones$Start_date <= date & geophones$End_date >= date)
+  current_geophones <- geophones[indices_current,]
+  current_geo_coords <- data.frame(X=current_geophones$X, Y=current_geophones$Y, Z=current_geophones$Z, Start_date=current_geophones$Start_date, End_date=current_geophones$End_date)
+  return(current_geo_coords)
+}
+geo_current_adj(used_geophones, check_dates[1])
 
+which(third_nearest_dist_3d < 3.2)
 
+index <- 1511
+geos_80 <- geo_current_adj(used_geophones, gron_eq_cat$Date[index])
+eq_80 <- gron_eq_cat[index,]
+plot(geos_80$X, geos_80$Y, pch=19, xlab = "Easting", ylab = "Northing", main = paste(gron_eq_cat$Date[index], "Earthquake"), ylim = c(530000, 625000), xlim = c(215000, 275000), sub = paste("V=", third_nearest_dist_3d[index]))
+points(eq_80$Easting, eq_80$Northing, pch=4, col="green", cex=2)
+points(gron_outline$X, gron_outline$Y, pch=19, col="red", cex=0.3)
+legend("topright", legend=c("Geophones", "Earthquake"), pch=c(19,4), col=c("black", "green"))
+ 
+plot(geos_80$Z, ylim=c(0, 3))
+points(eq_80$Depth, pch=4, col="green")
 
-
-
-
+par(mfrow=c(1,1))
+plot(as.Date(gron_eq_cat$Date),gron_eq_cat$V_3d, ylab = "Distance to 3rd geophone", xlab = "Date")

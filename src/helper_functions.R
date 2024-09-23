@@ -467,7 +467,9 @@ GPD_LL_step <- function(par, excess, thresh){
   
   sigma_tilde <- sigma + xi*(thresh)
   
-  if(all(sigma_tilde>0)){
+  sigma_check <- c(sigma, sigma_tilde)
+  
+  if(all(sigma_check>0)){
     if(abs(xi)<1e-10){
       return(-sum(log(sigma_tilde))-sum(excess/sigma_tilde))
     }
@@ -483,4 +485,62 @@ GPD_LL_step <- function(par, excess, thresh){
   else{
     return(-1e7)
   }
+}
+
+#Function to get par ests and confidence intervals
+get_par_ests_geo <- function(mags, thresh_fit, third_nearest_dist){
+  threshold <- thresh_fit$thresh[1] + thresh_fit$thresh[2]*third_nearest_dist
+  excesses <- mags[mags > threshold] - threshold[mags > threshold]
+  third_nearest_dist_excess <- third_nearest_dist[mags > threshold]
+  mle0 <- mean(excesses)
+  gpd_fit <- optim(GPD_LL_given_third_nearest, excess = excesses, par = c(mle0,0.1), control = list(fnscale = -1), thresh_par=thresh_fit$thresh, 
+                   third_nearest = third_nearest_dist_excess, min_dist = min(third_nearest_dist), max_dist = max(third_nearest_dist), hessian = TRUE)
+  check <- gpd_fit$par[1] == thresh_fit$par[1] & gpd_fit$par[2] == thresh_fit$par[2]
+  if(!check){
+    stop("Parameter estimates don't agree")
+  }
+  hessian <- gpd_fit$hessian
+  cov_matrix <- solve(-1*hessian)
+  se <- sqrt(diag(cov_matrix))
+  z <- qnorm(0.975)
+  lower <- gpd_fit$par - z*se
+  upper <- gpd_fit$par + z*se
+  return(list(par=gpd_fit$par, lower=lower, upper=upper))
+}
+
+get_par_ests_step <- function(mags, threshold){
+  threshold_excess <- threshold[mags > threshold]
+  excesses <- mags[mags > threshold] - threshold_excess
+  mle0 <- mean(excesses)
+  gpd_fit <- optim(GPD_LL_step, excess = excesses, par = c(mle0,0.1), control = list(fnscale = -1), thresh=threshold_excess, hessian = TRUE)
+  hessian <- gpd_fit$hessian
+  cov_matrix <- solve(-1*hessian)
+  se <- sqrt(diag(cov_matrix))
+  z <- qnorm(0.975)
+  lower <- gpd_fit$par - z*se
+  upper <- gpd_fit$par + z*se
+  return(list(par=gpd_fit$par, lower=lower, upper=upper))
+}
+
+get_qq_plot <- function(mags, thresh_fit, third_nearest_dist, n_boot = 200){
+  threshold <- thresh_fit$thresh[1] + thresh_fit$thresh[2]*third_nearest_dist
+  excesses <- mags[mags > threshold] - threshold[mags > threshold]
+  third_nearest_dist_excess <- third_nearest_dist[mags > threshold]
+  sigma_tilde <- thresh_fit$par[1] + thresh_fit$par[2]*threshold[mags > threshold]
+  transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = thresh_fit$par[2])
+  probs <- c(1:length(excesses))/(length(excesses)+1)
+  sample_quantiles <- quantile(transformed_excess, probs = probs)
+  model_quantiles <- qexp(probs, rate = 1)
+  
+  bootstrapped_quantiles <- matrix(NA, nrow = n_boot, ncol = length(probs))
+  for(i in 1:n_boot){
+    excess_boot <- rexp(length(excesses), rate = 1)
+    bootstrapped_quantiles[i,] <- quantile(excess_boot, probs = probs)
+  }
+  upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
+  lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
+  plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1)
+  abline(a = 0, b = 1, col="grey")
+  lines(model_quantiles, upper, col = "red", lwd=2, lty="dashed")
+  lines(model_quantiles, lower, col = "red", lwd=2, lty="dashed")
 }
