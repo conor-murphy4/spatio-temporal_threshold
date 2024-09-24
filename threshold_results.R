@@ -12,9 +12,14 @@ sqrt_third_nearest_dist_3d <- sqrt(third_nearest_dist_3d)
 #Fitted thresholds
 eqd_thresh_fit <- readRDS("threshold_results/const_thresh_fit.rds")
 
+eqd_threshold <- rep(const_thresh_fit$thresh, length(mags))
+
+conservative_threshold <- rep(1.45, length(mags))
+
+u_h_length <- which(gron_eq_cat$Date == as.Date("2015-01-06"))[1]
+piecewise_const_thresh <- c(rep(1.15, u_h_length), rep(0.76, length(mags) - u_h_length))
+
 geo_thresh_fit <- readRDS("threshold_results/geo_thresh_fit_2d.rds")
-log_geo_thresh_fit <- readRDS("threshold_results/log_geo_thresh_fit.rds")
-sqrt_geo_thresh_fit <- readRDS("threshold_results/sqrt_geo_thresh_fit.rds")
 
 geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d.rds")
 log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d.rds")
@@ -24,24 +29,16 @@ geo_thresh_fit_3d_un <- readRDS("threshold_results/geo_thresh_fit_3d_unconstrain
 log_geo_thresh_fit_3d_un <- readRDS("threshold_results/log_geo_thresh_fit_3d_unconstrained.rds")
 sqrt_geo_thresh_fit_3d_un <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d_unconstrained.rds")
 
-# Conservative constant threshold from Zak's work -------------------------
-conservative_threshold <- rep(1.45, length(mags))
+# Confidence intervals for sigma_0 and xi
 
 get_par_ests_step(mags, conservative_threshold)
 
-# Piece-wise constant threshold according to index ------------------------
-
-u_h_length <- which(gron_eq_cat$Date == as.Date("2015-01-06"))[1]
-piecewise_const_thresh <- c(rep(1.15, u_h_length), rep(0.76, length(mags) - u_h_length))
+get_par_ests_step(mags, eqd_threshold)
 
 get_par_ests_step(mags, piecewise_const_thresh)
 
-#Resulting thresholds, excesses and sigma(x,t) --------------------------------
-eqd_threshold <- rep(const_thresh_fit$thresh, length(mags))
+get_par_ests_geo(mags, geo_thresh_fit, third_nearest_dist)
 
-get_par_ests_step(mags, eqd_threshold)
-
-#Threshold based on V
 get_par_ests_geo(mags, geo_thresh_fit_3d, third_nearest_dist_3d)
 
 get_par_ests_geo(mags, log_geo_thresh_fit_3d, log_third_nearest_dist_3d)
