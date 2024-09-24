@@ -1,11 +1,12 @@
 gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
-
+source("src/eqd.R")
+source("src/eqd_geo.R")
 #All commented code could possibly be remioved.. This is code related to 2D version of V
 
 
 # Constant GPD fit with constant threshold estimated using EQD --------------------------------
 
-source("src/eqd.R")
+
 mags <- gron_eq_cat$Magnitude
 
 thresholds <- quantile(mags, seq(0,0.95, by=0.01))
@@ -19,7 +20,6 @@ excesses_const <- mags[mags > const_thresh_fit$thresh] - const_thresh_fit$thresh
 
 # Non-stationary GPD fit with threshold based on EQD given third_nearest_dist --------
 
-source("src/eqd_geo.R")
 third_nearest_dist <- gron_eq_cat$V
 third_nearest_dist_3d <- gron_eq_cat$V_3d
 
@@ -92,19 +92,25 @@ saveRDS(sqrt_geo_thresh_fit_3d, "threshold_results/sqrt_geo_thresh_fit_3d_uncons
 # Fitting V based thresholds before and after changepoint
 u_h_length <- which(gron_eq_cat$Date == as.Date("2015-01-06"))[1]
 V_cutoff <- 5
-# gron_eq_cat_before <- gron_eq_cat[1:u_h_length,]
-gron_eq_cat_before <- gron_eq_cat[gron_eq_cat$V <= 5,]
-mags_before <- gron_eq_cat_before$Magnitude
-third_nearest_dist_before <- gron_eq_cat_before$V
+gron_eq_cat_before <- gron_eq_cat[1:u_h_length,]
+gron_eq_cat_after <- gron_eq_cat[(u_h_length+1):nrow(gron_eq_cat),]
+gron_eq_cat_belowV <- gron_eq_cat[gron_eq_cat$V <= 5,]
+gron_eq_cat_aboveV <- gron_eq_cat[gron_eq_cat$V > 5,]
 
+mags_before <- gron_eq_cat_before$Magnitude
+mags_after <- gron_eq_cat_after$Magnitude
+mags_belowV <- gron_eq_cat_belowV$Magnitude
+mags_aboveV <- gron_eq_cat_aboveV$Magnitude
+
+third_nearest_dist_before <- gron_eq_cat_before$V
+third_nearest_dist_after <- gron_eq_cat_after$V
+third_nearest_dist_belowV <- gron_eq_cat_belowV$V
+third_nearest_dist_aboveV <- gron_eq_cat_aboveV$V
+
+#3D
 third_nearest_dist_3d_before <- gron_eq_cat_before$V_3d
 log_third_nearest_dist_3d_before <- log(third_nearest_dist_3d_before)
 sqrt_third_nearest_dist_3d_before <- sqrt(third_nearest_dist_3d_before)
-
-# gron_eq_cat_after <- gron_eq_cat[(u_h_length+1):nrow(gron_eq_cat),]
-gron_eq_cat_after <- gron_eq_cat[gron_eq_cat$V > 5,]
-mags_after <- gron_eq_cat_after$Magnitude
-third_nearest_dist_after <- gron_eq_cat_after$V
 
 third_nearest_dist_3d_after <- gron_eq_cat_after$V_3d
 log_third_nearest_dist_3d_after <- log(third_nearest_dist_3d_after)
@@ -115,13 +121,25 @@ intercepts <- seq(0, 1.5, by=0.02)
 slopes <- seq(0,2.5, by=0.02)
 threshold_matrix <- as.matrix(expand.grid(intercepts, slopes))
 
-#Before
+#Threshold estimates for different splits
 set.seed(11111)
-# geo_thresh_fit_3d_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_before, k=200, min_dist = min(third_nearest_dist_3d_before), max_dist = max(third_nearest_dist_3d_before))
-# geo_thresh_fit_3d_before <- eqd_geo_unconstrained(data=mags_before, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_3d_before, k=200)
-geo_thresh_fit_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_before, k=200, min_dist = min(third_nearest_dist_before), max_dist = max(third_nearest_dist_before))
+geo_thresh_fit_2D_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_before, k=200, min_dist = min(third_nearest_dist_before), max_dist = max(third_nearest_dist_before))
+saveRDS(geo_thresh_fit_2D_before, "threshold_results/geo_thresh_fit_2d_before.rds")
 
-saveRDS(geo_thresh_fit_before, "threshold_results/geo_thresh_fit_belowV.rds")
+set.seed(11111)
+geo_thresh_fit_2D_after <- eqd_geo(data=mags_after, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_after, k=200, min_dist = min(third_nearest_dist_after), max_dist = max(third_nearest_dist_after))
+saveRDS(geo_thresh_fit_2D_after, "threshold_results/geo_thresh_fit_2d_after.rds")
+
+set.seed(11111)
+geo_thresh_fit_2D_belowV <- eqd_geo(data=mags_belowV, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_belowV, k=200, min_dist = min(third_nearest_dist_belowV), max_dist = max(third_nearest_dist_belowV))
+saveRDS(geo_thresh_fit_2D_belowV, "threshold_results/geo_thresh_fit_2d_belowV.rds")
+
+set.seed(11111)
+geo_thresh_fit_2D_aboveV <- eqd_geo(data=mags_aboveV, thresh = threshold_matrix, third_nearest_distance = third_nearest_dist_aboveV, k=200, min_dist = min(third_nearest_dist_aboveV), max_dist = max(third_nearest_dist_aboveV))
+saveRDS(geo_thresh_fit_2D_aboveV, "threshold_results/geo_thresh_fit_2d_aboveV.rds")
+
+
+#3D threshold fits for different splits
 
 set.seed(11111)
 log_geo_thresh_fit_3d_before <- eqd_geo(data=mags_before, thresh = threshold_matrix, third_nearest_distance = log_third_nearest_dist_3d_before, k=200, min_dist = min(log_third_nearest_dist_3d_before), max_dist = max(log_third_nearest_dist_3d_before))
