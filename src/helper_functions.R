@@ -522,7 +522,8 @@ get_par_ests_step <- function(mags, threshold){
   return(list(par=gpd_fit$par, lower=lower, upper=upper))
 }
 
-get_qq_plot <- function(mags, thresh_fit, third_nearest_dist, n_boot = 200){
+#Update below function to work for different types of threshold
+get_qq_plot <- function(mags, thresh_fit, third_nearest_dist, n_boot = 200, main = "Q-Q plot"){
   threshold <- thresh_fit$thresh[1] + thresh_fit$thresh[2]*third_nearest_dist
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
   third_nearest_dist_excess <- third_nearest_dist[mags > threshold]
@@ -539,8 +540,60 @@ get_qq_plot <- function(mags, thresh_fit, third_nearest_dist, n_boot = 200){
   }
   upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
   lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
-  plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1)
+  plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1, main = main)
   abline(a = 0, b = 1, col="grey")
   lines(model_quantiles, upper, col = "red", lwd=2, lty="dashed")
   lines(model_quantiles, lower, col = "red", lwd=2, lty="dashed")
+}
+
+#Fix below function
+
+get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot"){
+  threshold_excess <- threshold[mags > threshold]
+  excesses <- mags[mags > threshold] - threshold_excess
+  sigma_tilde <- threshold
+  transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = 0.1)
+  probs <- c(1:length(excesses))/(length(excesses)+1)
+  sample_quantiles <- quantile(transformed_excess, probs = probs)
+  model_quantiles <- qexp(probs, rate = 1)
+  
+  bootstrapped_quantiles <- matrix(NA, nrow = n_boot, ncol = length(probs))
+  for(i in 1:n_boot){
+    excess_boot <- rexp(length(excesses), rate = 1)
+    bootstrapped_quantiles[i,] <- quantile(excess_boot, probs = probs)
+  }
+  upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
+  lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
+  plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1, main = main)
+  abline(a = 0, b = 1, col="grey")
+  lines(model_quantiles, upper, col = "red", lwd=2, lty="dashed")
+  lines(model_quantiles, lower, col = "red", lwd=2, lty="dashed")
+}
+
+get_eqd_value <- function(mags, threshold, par, num_boot = 200, m = 500, step = FALSE){
+  sigma <- par[1]
+  xi <- par[2]
+  excesses <- mags[mags > threshold] - threshold[mags > threshold]
+  distances <- numeric(num_boot)
+  for (j in 1:num_boot) {
+    sample_indices <- sample(c(1:length(excesses)), length(excesses), replace = TRUE)
+    boot_excesses <- excesses[sample_indices]
+    mle <- mean(boot_excesses)
+    ifelse(xi < 0, pars_init <-  c(mle, 0.1) ,pars_init <- c(sigma, xis[i]) )
+    if(step == TRUE){
+      thresh_boot <- threshold[mags > threshold][sample_indices]
+      gpd.fit <- optim(GPD_LL_step, excess = boot_excesses, par = pars_init, control = list(fnscale = -1), thresh = thresh_boot)
+      sigma_tilde <- gpd.fit$par[1] + gpd.fit$par[2]*thresh_boot
+      excesses_exp <- transform_to_exp(y = boot_excesses, sig = sigma_tilde, xi = gpd.fit$par[2])
+    }
+    else{
+      gpd.fit <- optim(GPD_LL, z = boot_excesses, par = pars_init, control = list(fnscale = -1))
+      excesses_exp <- transform_to_exp(y = boot_excesses, sig = gpd.fit$par[1], xi = gpd.fit$par[2])
+    }
+    sample_quants <- quantile(excesses_exp, probs = (1:m)/(m+1))
+    model_quants <- qexp(p = (1:m)/(m+1), rate = 1)
+    distances[j] <- mean(abs(sample_quants - model_quants))
+  }
+  eqd_value <- mean(distances)
+  return(eqd_value)
 }
