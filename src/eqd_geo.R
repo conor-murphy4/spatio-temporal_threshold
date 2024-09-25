@@ -52,7 +52,9 @@ eqd_geo <- function(data, thresh, third_nearest_distance, k = 100, m = 500, min_
         gpd.fit <- optim(GPD_LL_given_third_nearest, excess = excess_boot, par = pars_init, control = list(fnscale = -1), thresh_par=thresh[i,], third_nearest = third_nearest_excess_boot, min_dist = min_dist, max_dist = max_dist)
         sigma_given_third_nearest <- gpd.fit$par[[1]] + gpd.fit$par[[2]] * (thresh[i,1] + thresh[i,2]*third_nearest_excess_boot)
         transformed_excess_boot <- transform_to_exp(y = excess_boot, sig = sigma_given_third_nearest, xi = gpd.fit$par[[2]])
-        distances[j] <- mean(abs(quantile(excess_boot, probs = (1:m) / (m+1)) - qexp((1:m) / (m+1), rate = 1)))
+        sample_quants <- quantile(transformed_excess_boot, probs = (1:m) / (m+1))
+        model_quants <- qexp((1:m) / (m+1), rate = 1)
+        distances[j] <- mean(abs(sample_quants - model_quants))
       }
       meandistances[i] <- mean(distances)
     }
@@ -103,7 +105,59 @@ eqd_geo_unconstrained <- function(data, thresh, third_nearest_distance, k = 100,
         gpd.fit <- optim(GPD_LL_given_third_nearest_unconstrained, excess = excess_boot, par = pars_init, control = list(fnscale = -1), thresh_par=thresh[i,], third_nearest = third_nearest_excess_boot)
         sigma_given_third_nearest <- gpd.fit$par[[1]] + gpd.fit$par[[2]] * (thresh[i,1] + thresh[i,2]*third_nearest_excess_boot)
         transformed_excess_boot <- transform_to_exp(y = excess_boot, sig = sigma_given_third_nearest, xi = gpd.fit$par[[2]])
-        distances[j] <- mean(abs(quantile(excess_boot, probs = (1:m) / (m+1)) - qexp((1:m) / (m+1), rate = 1)))
+        sample_quants <- quantile(transformed_excess_boot, probs = (1:m) / (m+1))
+        model_quants <- qexp((1:m) / (m+1), rate = 1)
+        distances[j] <- mean(abs(sample_quants - model_quants))
+      }
+      meandistances[i] <- mean(distances)
+    }
+    else{
+      meandistances[i] <- NA
+    }
+  }
+  chosen_index <- which.min(meandistances)
+  chosen_threshold_par <- thresh[chosen_index,]
+  xi <- xis[chosen_index]
+  sigma <- sigmas[chosen_index]
+  len <- num_excess[chosen_index]
+  result <- list(thresh_par = chosen_threshold_par, par = c(sigma,xi), num_excess = len, dists = meandistances)
+  return(result)
+}
+
+eqd_stepped <- function(data, thresh, change_index, k = 100, m = 500, underlying_thresh = 0){
+  
+  # Check inputs are valid
+  if (!is.numeric(data)) stop("Data must be a vector")
+  if (!is.matrix(thresh)) stop("Thresholds must be a matrix")
+  if (k <= 0 | k %% 1 != 0) stop("Number of bootstrapped samples must be a positive integer")
+  if (m <= 0 | m %% 1 != 0) stop("Number of equally spaced probabilities must be a positive integer")
+  
+  meandistances <- xis <- sigmas <- num_excess <- numeric(nrow(thresh))
+  for (i in 1:nrow(thresh)) {
+    print(i)
+    u <- c(rep(thresh[i,1], change_index), rep(thresh[i,2], length(data) - change_index))
+    if(any(u < underlying_thresh)) stop(paste("Candidate thresholds must be above the underlying threshold of ", underlying_thresh))
+    excess <- data[data > u] - u[data > u]
+    num_excess[i] <- length(excess)
+    if (num_excess[i] > 10) {
+      mle0 <- mean(excess)
+      init.fit <- optim(GPD_LL_step, excess = excess, par = c(mle0,0.1), control = list(fnscale = -1), thresh=u)
+      xis[i] <- init.fit$par[[2]]
+      sigmas[i] <- init.fit$par[[1]]
+      distances <- numeric(k)
+      for (j in 1:k) {
+        #possible way to bootstrap
+        sampled_indices <- sample(1:num_excess[i], num_excess[i], replace = TRUE)
+        excess_boot <- excess[sampled_indices]
+        thresh_boot <- u[sampled_indices]
+        init_mle <- mean(excess_boot)
+        ifelse(xis[i] < 0, pars_init <-  c(init_mle, 0.1) ,pars_init <- c(sigmas[i], xis[i]) )
+        gpd.fit <- optim(GPD_LL_step, excess = excess_boot, par = pars_init, control = list(fnscale = -1), thresh=thresh_boot)
+        sigma_tilde <- gpd.fit$par[[1]] + gpd.fit$par[[2]] * (thresh_boot)
+        transformed_excess_boot <- transform_to_exp(y = excess_boot, sig = sigma_tilde, xi = gpd.fit$par[[2]])
+        sample_quants <- quantile(transformed_excess_boot, probs = (1:m) / (m+1))
+        model_quants <- qexp((1:m) / (m+1), rate = 1)
+        distances[j] <- mean(abs(sample_quants - model_quants))
       }
       meandistances[i] <- mean(distances)
     }
