@@ -6,7 +6,6 @@ source("src/eqd_geo.R")
 
 # Constant GPD fit with constant threshold estimated using EQD --------------------------------
 
-
 mags <- gron_eq_cat$Magnitude
 
 thresholds <- quantile(mags, seq(0,0.95, by=0.01))

@@ -4,13 +4,15 @@ source("src/distance_to_third_nearest_geo.R")
 
 gron_outline <- read.csv('Data/Geophones/Groningen_Field_outline.csv', header=T)
 gron_polygon <- read.table('Data/Geophones/polygon_for_groningen_earthquakes.txt', header=T)
-geophones <- read.csv("Data/Geophones/Geophones_processed_03-07-2024.csv", header=T, row.names = 1)
+geophones <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_without_duplicates.csv", header=T, row.names = 1)
+geophones_deepest <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_deepest_only.csv", header=T, row.names = 1)
 gron_eq_cat_all_netherlands <- read.csv("Data/Events/unrounded_after_geophone_start.csv", header=T, row.names = 1)
 gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
 gron_eq_cat_all <- read.csv("Data/Events/unrounded_after_geophone_start_in_polygon_with_V_3d.csv", header=T)
 gron_eq_cat_old <- read.csv("Data/Events/2022-04-12_15-09-25_cat.csv", header=T)
 
-included_geos <- what_geos(gron_eq_cat, geophones)
+# included_geos <- what_geos(gron_eq_cat, geophones)
+
 #Restricting EQs to within the groningen polygon
 # gron_eq_cat_in_polygon <- gron_eq_cat[inpolygon(gron_eq_cat$Easting, gron_eq_cat$Northing, gron_polygon$POINT_X, gron_polygon$POINT_Y),]
 # write.csv(gron_eq_cat_in_polygon, "Data/Events/unrounded_after_geophone_start_in_polygon.csv")
@@ -51,13 +53,13 @@ max(gron_outline$X) - min(gron_outline$X)
 
 #Finding distance to third nearest geophone for observed events in gron_eq_cat
 
-third_nearest_dist <- distance_to_third_nearest(gron_eq_cat, geophones)
+third_nearest_dist <- distance_to_third_nearest(gron_eq_cat, geophones_deepest)
 gron_eq_cat$V <- third_nearest_dist
-write.csv(gron_eq_cat, "Data/Events/unrounded_after_geophone_start_in_polygon_with_V.csv")
 
-third_nearest_dist_3d <- distance_to_third_nearest_3d(gron_eq_cat, geophones)
+third_nearest_dist_3d <- distance_to_third_nearest_3d(gron_eq_cat, geophones_deepest)
+third_nearest_dist_3d_all <- distance_to_third_nearest_3d(gron_eq_cat, geophones) 
 gron_eq_cat$V_3d <- third_nearest_dist_3d
-write.csv(gron_eq_cat, "Data/Events/unrounded_after_geophone_start_in_polygon_with_V_3d.csv")
+write.csv(gron_eq_cat, "Data/Events/unrounded_after_1995_in_polygon.csv")
 
 #For each year in gron_eq_cat, find the minimum V
 gron_eq_cat$Year <- as.numeric(format(as.Date(gron_eq_cat$Date), "%Y"))
@@ -130,7 +132,11 @@ grid_in_polygon_3d <- grid_3d[inpolygon(grid_3d$X, grid_3d$Y, gron_polygon$POINT
 grid_in_outline_3d <- grid_3d[inpolygon(grid_3d$X, grid_3d$Y, gron_outline$X, gron_outline$Y),]
 
 # Find the distance to the third nearest geophone for each grid point and day
-date_sequence <- sort(unique(geophones$Start_date, geophones$End_date))
+date_sequence_old <- sort(unique(c(geophones$Start_date, geophones$End_date)))
+date_sequence <- sort(unique(geophones_deepest$Start_date, geophones_deepest$End_date))
+
+min(as.Date(date_sequence_old))
+max(as.Date(date_sequence_old))
 
 mean_third_nearest_dist_polygon <- mean_third_distance_grid(grid_in_polygon, geophones, date_sequence)
 mean_third_nearest_dist_outline <- mean_third_distance_grid(grid_in_outline, geophones, date_sequence)

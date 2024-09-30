@@ -7,7 +7,7 @@ euclid_dist<- function(eq_locations, geo_coords){
 }
 
 euclid_dist_3d <- function(eq_locations, geo_coords){
-  dist <- apply(eq_locations, 1, function(x,z){sqrt(((x[[1]]-z[[1]])/1000)^2+((x[[2]]-z[[2]])/1000)^2+(x[[3]]-z[[3]])^2)}, z=geo_coords)
+  dist <- apply(eq_locations, 1, function(x,z){sqrt(((x[[1]]-z[[1]])/1000)^2+((x[[2]]-z[[2]])/1000)^2+(x[[3]]-z[[3]]/1000)^2)}, z=geo_coords)
   return(dist)
 }
 

@@ -2,9 +2,7 @@ source("src/helper_functions.R")
 
 gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
 mags <- gron_eq_cat$Magnitude
-third_nearest_dist <- gron_eq_cat$V
-log_third_nearest_dist <- log(third_nearest_dist)
-sqrt_third_nearest_dist <- sqrt(third_nearest_dist)
+third_nearest_dist_2d <- gron_eq_cat$V
 third_nearest_dist_3d <- gron_eq_cat$V_3d
 log_third_nearest_dist_3d <- log(third_nearest_dist_3d)
 sqrt_third_nearest_dist_3d <- sqrt(third_nearest_dist_3d)
@@ -19,7 +17,7 @@ conservative_threshold <- rep(1.45, length(mags))
 u_h_length <- which(gron_eq_cat$Date == as.Date("2015-01-06"))[1]
 piecewise_const_thresh <- c(rep(1.15, u_h_length), rep(0.76, length(mags) - u_h_length))
 
-geo_thresh_fit <- readRDS("threshold_results/geo_thresh_fit_2d.rds")
+geo_thresh_fit_2d <- readRDS("threshold_results/geo_thresh_fit_2d.rds")
 
 geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d.rds")
 log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d.rds")
@@ -37,13 +35,37 @@ get_par_ests_step(mags, eqd_threshold)
 
 get_par_ests_step(mags, piecewise_const_thresh)
 
-get_par_ests_geo(mags, geo_thresh_fit, third_nearest_dist)
+get_par_ests_geo(mags, geo_thresh_fit_2d, third_nearest_dist_2d)
 
 get_par_ests_geo(mags, geo_thresh_fit_3d, third_nearest_dist_3d)
 
 get_par_ests_geo(mags, log_geo_thresh_fit_3d, log_third_nearest_dist_3d)
 
 get_par_ests_geo(mags, sqrt_geo_thresh_fit_3d, sqrt_third_nearest_dist_3d)
+
+# EQD values
+set.seed(11111)
+get_eqd_value(mags, conservative_threshold, par = get_par_ests_step(mags, conservative_threshold)$par, step = TRUE)
+
+min(eqd_thresh_fit$dist)
+
+set.seed(11111)
+get_eqd_value(mags, piecewise_const_thresh, par = get_par_ests_step(mags, piecewise_const_thresh)$par, step = TRUE)
+
+min(geo_thresh_fit_2d$dists, na.rm = TRUE)
+min(geo_thresh_fit_3d$dists, na.rm = TRUE)
+min(log_geo_thresh_fit_3d$dists, na.rm = TRUE)
+min(sqrt_geo_thresh_fit_3d$dists, na.rm = TRUE)
+
+#QQplots
+dev.new(height=10, width=30, noRStudioGD = TRUE)
+par(mfrow=c(1,3), bg='transparent')
+get_qq_plot(mags, eqd_thresh_fit, "EQD threshold")
+
+get_qq_plot(mags, geo_thresh_fit_3d, third_nearest_dist_3d, main="V_3d (All)" )
+get_qq_plot(mags, log_geo_thresh_fit_3d, log_third_nearest_dist_3d, main="log(V_3d) (All)")
+get_qq_plot(mags, sqrt_geo_thresh_fit_3d, sqrt_third_nearest_dist_3d, main="sqrt(V_3d) (All)")
+
 
 # Visualising thresholds
 
@@ -63,340 +85,6 @@ lines(sqrt_geo_thresh_fit_3d$thresh[[1]] + sqrt_geo_thresh_fit_3d$thresh[[2]]*sq
 legend("topright", legend=c("Threshold on V_3d", "Threshold on log(V_3d)", "Threshold on sqrt(V_3d)"), col=c("purple", "orange", "brown"), lty=1, cex=0.8)
 
 # Comparing QQplots on standard Exponential margins -----------------------
-
-#QQplot on Exp scale for easy comparison to more complex models
-
-exp_transformed_excesses_const <- transform_to_exp(excesses_const, sig = const_thresh_fit$par[1], xi = const_thresh_fit$par[2])
-exp_transformed_excesses_conservative <- transform_to_exp(excesses_conservative, sig = conservative_thresh_fit$par[1], xi = conservative_thresh_fit$par[2])
-exp_transformed_excesses_piecewise_const <- transform_to_exp(excesses_piecewise_const, sig = pc_sigma_excess, xi = piecewise_const_thresh_fit$par[2])
-exp_transformed_excesses_geo_3d <- transform_to_exp(excesses_geo_3d, sig = geo_sigma_3d, xi = geo_thresh_fit_3d$par[2])
-exp_transformed_excesses_log_geo_3d <- transform_to_exp(excesses_log_geo_3d, sig = log_geo_sigma_3d, xi = log_geo_thresh_fit_3d$par[2])
-exp_transformed_excesses_sqrt_geo_3d <- transform_to_exp(excesses_sqrt_geo_3d, sig = sqrt_geo_sigma_3d, xi = sqrt_geo_thresh_fit_3d$par[2])
-
-sample_quantiles_exp_const <- quantile(exp_transformed_excesses_const, c(1:length(excesses_const))/(length(excesses_const)+1))
-sample_quantiles_exp_conservative <- quantile(exp_transformed_excesses_conservative, c(1:length(excesses_conservative))/(length(excesses_conservative)+1))
-sample_quantiles_exp_piecewise_const <- quantile(exp_transformed_excesses_piecewise_const, c(1:length(excesses_piecewise_const))/(length(excesses_piecewise_const)+1))
-sample_quantiles_exp_geo_3d <- quantile(exp_transformed_excesses_geo_3d, c(1:length(excesses_geo_3d))/(length(excesses_geo_3d)+1))
-sample_quantiles_exp_log_geo_3d <- quantile(exp_transformed_excesses_log_geo_3d, c(1:length(excesses_log_geo_3d))/(length(excesses_log_geo_3d)+1))
-sample_quantiles_exp_sqrt_geo_3d <- quantile(exp_transformed_excesses_sqrt_geo_3d, c(1:length(excesses_sqrt_geo_3d))/(length(excesses_sqrt_geo_3d)+1))
-
-n_boot <- 200
-bootstrapped_model_quants_const <- matrix(NA, nrow = n_boot, ncol= length(excesses_const))
-bootstrapped_model_quants_conservative <- matrix(NA, nrow = n_boot, ncol= length(excesses_conservative))
-bootstrapped_model_quants_piecewise_const <- matrix(NA, nrow = n_boot, ncol= length(excesses_piecewise_const))
-bootstrapped_model_quants_geo_3d <- matrix(NA, nrow = n_boot, ncol= length(excesses_geo_3d))
-bootstrapped_model_quants_log_geo_3d <- matrix(NA, nrow = n_boot, ncol= length(excesses_log_geo_3d))
-bootstrapped_model_quants_sqrt_geo_3d <- matrix(NA, nrow = n_boot, ncol= length(excesses_sqrt_geo_3d))
-
-for(i in 1:n_boot){
-  boot_excess_exp_const <- rexp(length(excesses_const), rate = 1)
-  boot_excess_exp_conservative <- rexp(length(excesses_conservative), rate = 1)
-  boot_excess_exp_piecewise_const <- rexp(length(excesses_piecewise_const), rate = 1)
-  boot_excess_exp_geo_3d <- rexp(length(excesses_geo_3d), rate = 1)
-  boot_excess_exp_log_geo_3d <- rexp(length(excesses_log_geo_3d), rate = 1)
-  boot_excess_exp_sqrt_geo_3d <- rexp(length(excesses_sqrt_geo_3d), rate = 1)
-  
-  bootstrapped_model_quants_const[i,] <- quantile(boot_excess_exp_const, c(1:length(excesses_const))/(length(excesses_const)+1))
-  bootstrapped_model_quants_conservative[i,] <- quantile(boot_excess_exp_conservative, c(1:length(excesses_conservative))/(length(excesses_conservative)+1))
-  bootstrapped_model_quants_piecewise_const[i,] <- quantile(boot_excess_exp_piecewise_const, c(1:length(excesses_piecewise_const))/(length(excesses_piecewise_const)+1))
-  bootstrapped_model_quants_geo_3d[i,] <- quantile(boot_excess_exp_geo_3d, c(1:length(excesses_geo_3d))/(length(excesses_geo_3d)+1))
-  bootstrapped_model_quants_log_geo_3d[i,] <- quantile(boot_excess_exp_log_geo_3d, c(1:length(excesses_log_geo_3d))/(length(excesses_log_geo_3d)+1))
-  bootstrapped_model_quants_sqrt_geo_3d[i,] <- quantile(boot_excess_exp_sqrt_geo_3d, c(1:length(excesses_sqrt_geo_3d))/(length(excesses_sqrt_geo_3d)+1))
-}
-
-upper_tolerance_int_const <- apply(bootstrapped_model_quants_const, 2, quantile, prob = 0.975)
-upper_tolerance_int_conservative <- apply(bootstrapped_model_quants_conservative, 2, quantile, prob = 0.975)
-upper_tolerance_int_piecewise_const <- apply(bootstrapped_model_quants_piecewise_const, 2, quantile, prob = 0.975)
-upper_tolerance_int_geo_3d <- apply(bootstrapped_model_quants_geo_3d, 2, quantile, prob = 0.975)
-upper_tolerance_int_log_geo_3d <- apply(bootstrapped_model_quants_log_geo_3d, 2, quantile, prob = 0.975)
-upper_tolerance_int_sqrt_geo_3d <- apply(bootstrapped_model_quants_sqrt_geo_3d, 2, quantile, prob = 0.975)
-
-lower_tolerance_int_const <- apply(bootstrapped_model_quants_const, 2, quantile, prob = 0.025)
-lower_tolerance_int_conservative <- apply(bootstrapped_model_quants_conservative, 2, quantile, prob = 0.025)
-lower_tolerance_int_piecewise_const <- apply(bootstrapped_model_quants_piecewise_const, 2, quantile, prob = 0.025)
-lower_tolerance_int_geo_3d <- apply(bootstrapped_model_quants_geo_3d, 2, quantile, prob = 0.025)
-lower_tolerance_int_log_geo_3d <- apply(bootstrapped_model_quants_log_geo_3d, 2, quantile, prob = 0.025)
-lower_tolerance_int_sqrt_geo_3d <- apply(bootstrapped_model_quants_sqrt_geo_3d, 2, quantile, prob = 0.025)
-
-dev.new(height=20, width=30, noRStudioGD = TRUE)
-par(mfrow=c(2,3), bg='transparent')
-
-max_plot <- max(c(upper_tolerance_int_const, upper_tolerance_int_geo_3d, upper_tolerance_int_log_geo_3d, upper_tolerance_int_sqrt_geo_3d))
-
-model_quantiles_exp <- qexp(c(1:length(excesses_const))/(length(excesses_const)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_const, main = "EQD threshold", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_const, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_const, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_conservative))/(length(excesses_conservative)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_conservative, main = "Conservative threshold", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_conservative, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_conservative, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_piecewise_const))/(length(excesses_piecewise_const)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_piecewise_const, main = "Piecewise constant threshold", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_piecewise_const, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_piecewise_const, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_geo_3d))/(length(excesses_geo_3d)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_geo_3d, main = "EQD threshold with V 3D", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_geo_3d, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_geo_3d, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_log_geo_3d))/(length(excesses_log_geo_3d)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_log_geo_3d, main = "EQD threshold with logV 3D", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_log_geo_3d, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_log_geo_3d, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_sqrt_geo_3d))/(length(excesses_sqrt_geo_3d)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_sqrt_geo_3d, main = "EQD threshold with sqrtV 3D", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_sqrt_geo_3d, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_sqrt_geo_3d, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-# Focusing on before/after changepoint and redoing QQplots
-
-gron_eq_cat_before <- gron_eq_cat[1:u_h_length,]
-mags_before <- gron_eq_cat_before$Magnitude
-third_nearest_dist_3d_before <- gron_eq_cat_before$V_3d
-log_third_nearest_dist_3d_before <- log(third_nearest_dist_3d_before)
-sqrt_third_nearest_dist_3d_before <- sqrt(third_nearest_dist_3d_before)
-
-gron_eq_cat_after <- gron_eq_cat[(u_h_length+1):nrow(gron_eq_cat),]
-mags_after <- gron_eq_cat_after$Magnitude
-third_nearest_dist_3d_after <- gron_eq_cat_after$V_3d
-log_third_nearest_dist_3d_after <- log(third_nearest_dist_3d_after)
-sqrt_third_nearest_dist_3d_after <- sqrt(third_nearest_dist_3d_after)
-
-pc_thresh_before <- piecewise_const_thresh[1:u_h_length]
-pc_thresh_after <- piecewise_const_thresh[(u_h_length+1):nrow(gron_eq_cat)]
-
-geo_chosen_threshold_3d_before <- geo_thresh_fit_3d$thresh[1] + geo_thresh_fit_3d$thresh[2]*third_nearest_dist_3d_before
-geo_chosen_threshold_3d_after <- geo_thresh_fit_3d$thresh[1] + geo_thresh_fit_3d$thresh[2]*third_nearest_dist_3d_after
-
-log_geo_chosen_threshold_3d_before <- log_geo_thresh_fit_3d$thresh_par[1] + log_geo_thresh_fit_3d$thresh_par[2]*log_third_nearest_dist_3d_before
-log_geo_chosen_threshold_3d_after <- log_geo_thresh_fit_3d$thresh_par[1] + log_geo_thresh_fit_3d$thresh_par[2]*log_third_nearest_dist_3d_after
-
-sqrt_geo_chosen_threshold_3d_before <- sqrt_geo_thresh_fit_3d$thresh[1] + sqrt_geo_thresh_fit_3d$thresh[2]*sqrt_third_nearest_dist_3d_before
-sqrt_geo_chosen_threshold_3d_after <- sqrt_geo_thresh_fit_3d$thresh[1] + sqrt_geo_thresh_fit_3d$thresh[2]*sqrt_third_nearest_dist_3d_after
-
-#Sigmas
-pc_sigma_before <- piecewise_const_thresh_fit$par[1] + piecewise_const_thresh_fit$par[2]*pc_thresh_before[mags_before > pc_thresh_before]
-pc_sigma_after <- piecewise_const_thresh_fit$par[1] + piecewise_const_thresh_fit$par[2]*pc_thresh_after[mags_after > pc_thresh_after]
-
-geo_sigma_3d_before <- geo_thresh_fit_3d$par[1] + geo_thresh_fit_3d$par[2]*geo_chosen_threshold_3d_before[mags_before > geo_chosen_threshold_3d_before]
-geo_sigma_3d_after <- geo_thresh_fit_3d$par[1] + geo_thresh_fit_3d$par[2]*geo_chosen_threshold_3d_after[mags_after > geo_chosen_threshold_3d_after]
-
-log_geo_sigma_3d_before <- log_geo_thresh_fit_3d$par[1] + log_geo_thresh_fit_3d$par[2]*log_geo_chosen_threshold_3d_before[mags_before > log_geo_chosen_threshold_3d_before]
-log_geo_sigma_3d_after <- log_geo_thresh_fit_3d$par[1] + log_geo_thresh_fit_3d$par[2]*log_geo_chosen_threshold_3d_after[mags_after > log_geo_chosen_threshold_3d_after]
-
-sqrt_geo_sigma_3d_before <- sqrt_geo_thresh_fit_3d$par[1] + sqrt_geo_thresh_fit_3d$par[2]*sqrt_geo_chosen_threshold_3d_before[mags_before > sqrt_geo_chosen_threshold_3d_before]
-sqrt_geo_sigma_3d_after <- sqrt_geo_thresh_fit_3d$par[1] + sqrt_geo_thresh_fit_3d$par[2]*sqrt_geo_chosen_threshold_3d_after[mags_after > sqrt_geo_chosen_threshold_3d_after]
-
-#Excesses
-excesses_conservative_before <- mags_before[mags_before > conservative_threshold] - conservative_threshold
-excesses_conservative_after <- mags_after[mags_after > conservative_threshold] - conservative_threshold
-
-excesses_pc_before <- mags_before[mags_before > pc_thresh_before] - pc_thresh_before[mags_before > pc_thresh_before]
-excesses_pc_after <- mags_after[mags_after > pc_thresh_after] - pc_thresh_after[mags_after > pc_thresh_after]
-
-excesses_const_before <- mags_before[mags_before > const_thresh_fit$thresh] - const_thresh_fit$thresh
-excesses_const_after <- mags_after[mags_after > const_thresh_fit$thresh] - const_thresh_fit$thresh
-
-excesses_geo_3d_before <- mags_before[mags_before > geo_chosen_threshold_3d_before] - geo_chosen_threshold_3d_before[mags_before > geo_chosen_threshold_3d_before]
-excesses_geo_3d_after <- mags_after[mags_after > geo_chosen_threshold_3d_after] - geo_chosen_threshold_3d_after[mags_after > geo_chosen_threshold_3d_after]
-
-excesses_log_geo_3d_before <- mags_before[mags_before > log_geo_chosen_threshold_3d_before] - log_geo_chosen_threshold_3d_before[mags_before > log_geo_chosen_threshold_3d_before]
-excesses_log_geo_3d_after <- mags_after[mags_after > log_geo_chosen_threshold_3d_after] - log_geo_chosen_threshold_3d_after[mags_after > log_geo_chosen_threshold_3d_after]
-
-excesses_sqrt_geo_3d_before <- mags_before[mags_before > sqrt_geo_chosen_threshold_3d_before] - sqrt_geo_chosen_threshold_3d_before[mags_before > sqrt_geo_chosen_threshold_3d_before]
-excesses_sqrt_geo_3d_after <- mags_after[mags_after > sqrt_geo_chosen_threshold_3d_after] - sqrt_geo_chosen_threshold_3d_after[mags_after > sqrt_geo_chosen_threshold_3d_after]
-
-#QQplots
-exp_transformed_excesses_const_before <- transform_to_exp(excesses_const_before, sig = const_thresh_fit$par[1], xi = const_thresh_fit$par[2])
-exp_transformed_excesses_conservative_before <- transform_to_exp(excesses_conservative_before, sig = conservative_thresh_fit$par[1], xi = conservative_thresh_fit$par[2])
-exp_transformed_excesses_pc_before <- transform_to_exp(excesses_pc_before, sig = pc_sigma_before, xi = piecewise_const_thresh_fit$par[2])
-exp_transformed_excesses_geo_3d_before <- transform_to_exp(excesses_geo_3d_before, sig = geo_sigma_3d_before, xi = geo_thresh_fit_3d$par[2])
-exp_transformed_excesses_log_geo_3d_before <- transform_to_exp(excesses_log_geo_3d_before, sig = log_geo_sigma_3d_before, xi = log_geo_thresh_fit_3d$par[2])
-exp_transformed_excesses_sqrt_geo_3d_before <- transform_to_exp(excesses_sqrt_geo_3d_before, sig = sqrt_geo_sigma_3d_before, xi = sqrt_geo_thresh_fit_3d$par[2])
-
-exp_transformed_excesses_const_after <- transform_to_exp(excesses_const_after, sig = const_thresh_fit$par[1], xi = const_thresh_fit$par[2])
-exp_transformed_excesses_conservative_after <- transform_to_exp(excesses_conservative_after, sig = conservative_thresh_fit$par[1], xi = conservative_thresh_fit$par[2])
-exp_transformed_excesses_pc_after <- transform_to_exp(excesses_pc_after, sig = pc_sigma_after, xi = piecewise_const_thresh_fit$par[2])
-exp_transformed_excesses_geo_3d_after <- transform_to_exp(excesses_geo_3d_after, sig = geo_sigma_3d_after, xi = geo_thresh_fit_3d$par[2])
-exp_transformed_excesses_log_geo_3d_after <- transform_to_exp(excesses_log_geo_3d_after, sig = log_geo_sigma_3d_after, xi = log_geo_thresh_fit_3d$par[2])
-exp_transformed_excesses_sqrt_geo_3d_after <- transform_to_exp(excesses_sqrt_geo_3d_after, sig = sqrt_geo_sigma_3d_after, xi = sqrt_geo_thresh_fit_3d$par[2])
-
-sample_quantiles_exp_const_before <- quantile(exp_transformed_excesses_const_before, c(1:length(excesses_const_before))/(length(excesses_const_before)+1))
-sample_quantiles_exp_conservative_before <- quantile(exp_transformed_excesses_conservative_before, c(1:length(excesses_conservative_before))/(length(excesses_conservative_before)+1))
-sample_quantiles_exp_pc_before <- quantile(exp_transformed_excesses_pc_before, c(1:length(excesses_pc_before))/(length(excesses_pc_before)+1))
-sample_quantiles_exp_geo_3d_before <- quantile(exp_transformed_excesses_geo_3d_before, c(1:length(excesses_geo_3d_before))/(length(excesses_geo_3d_before)+1))
-sample_quantiles_exp_log_geo_3d_before <- quantile(exp_transformed_excesses_log_geo_3d_before, c(1:length(excesses_log_geo_3d_before))/(length(excesses_log_geo_3d_before)+1))
-sample_quantiles_exp_sqrt_geo_3d_before <- quantile(exp_transformed_excesses_sqrt_geo_3d_before, c(1:length(excesses_sqrt_geo_3d_before))/(length(excesses_sqrt_geo_3d_before)+1))
-
-sample_quantiles_exp_const_after <- quantile(exp_transformed_excesses_const_after, c(1:length(excesses_const_after))/(length(excesses_const_after)+1))
-sample_quantiles_exp_conservative_after <- quantile(exp_transformed_excesses_conservative_after, c(1:length(excesses_conservative_after))/(length(excesses_conservative_after)+1))
-sample_quantiles_exp_pc_after <- quantile(exp_transformed_excesses_pc_after, c(1:length(excesses_pc_after))/(length(excesses_pc_after)+1))
-sample_quantiles_exp_geo_3d_after <- quantile(exp_transformed_excesses_geo_3d_after, c(1:length(excesses_geo_3d_after))/(length(excesses_geo_3d_after)+1))
-sample_quantiles_exp_log_geo_3d_after <- quantile(exp_transformed_excesses_log_geo_3d_after, c(1:length(excesses_log_geo_3d_after))/(length(excesses_log_geo_3d_after)+1))
-sample_quantiles_exp_sqrt_geo_3d_after <- quantile(exp_transformed_excesses_sqrt_geo_3d_after, c(1:length(excesses_sqrt_geo_3d_after))/(length(excesses_sqrt_geo_3d_after)+1))
-
-n_boot <- 200
-bootstrapped_model_quants_const_before <- matrix(NA, nrow = n_boot, ncol= length(excesses_const_before))
-bootstrapped_model_quants_conservative_before <- matrix(NA, nrow = n_boot, ncol= length(excesses_conservative_before))
-bootstrapped_model_quants_pc_before <- matrix(NA, nrow = n_boot, ncol= length(excesses_pc_before))
-bootstrapped_model_quants_geo_3d_before <- matrix(NA, nrow = n_boot, ncol= length(excesses_geo_3d_before))
-bootstrapped_model_quants_log_geo_3d_before <- matrix(NA, nrow = n_boot, ncol= length(excesses_log_geo_3d_before))
-bootstrapped_model_quants_sqrt_geo_3d_before <- matrix(NA, nrow = n_boot, ncol= length(excesses_sqrt_geo_3d_before))
-
-bootstrapped_model_quants_const_after <- matrix(NA, nrow = n_boot, ncol= length(excesses_const_after))
-bootstrapped_model_quants_conservative_after <- matrix(NA, nrow = n_boot, ncol= length(excesses_conservative_after))
-bootstrapped_model_quants_pc_after <- matrix(NA, nrow = n_boot, ncol= length(excesses_pc_after))
-bootstrapped_model_quants_geo_3d_after <- matrix(NA, nrow = n_boot, ncol= length(excesses_geo_3d_after))
-bootstrapped_model_quants_log_geo_3d_after <- matrix(NA, nrow = n_boot, ncol= length(excesses_log_geo_3d_after))
-bootstrapped_model_quants_sqrt_geo_3d_after <- matrix(NA, nrow = n_boot, ncol= length(excesses_sqrt_geo_3d_after))
-
-for(i in 1:n_boot){
-  boot_excess_exp_const_before <- rexp(length(excesses_const_before), rate = 1)
-  boot_excess_exp_conservative_before <- rexp(length(excesses_conservative_before), rate = 1)
-  boot_excess_exp_pc_before <- rexp(length(excesses_pc_before), rate = 1)
-  boot_excess_exp_geo_3d_before <- rexp(length(excesses_geo_3d_before), rate = 1)
-  boot_excess_exp_log_geo_3d_before <- rexp(length(excesses_log_geo_3d_before), rate = 1)
-  boot_excess_exp_sqrt_geo_3d_before <- rexp(length(excesses_sqrt_geo_3d_before), rate = 1)
-  
-  boot_excess_exp_const_after <- rexp(length(excesses_const_after), rate = 1)
-  boot_excess_exp_conservative_after <- rexp(length(excesses_conservative_after), rate = 1)
-  boot_excess_exp_pc_after <- rexp(length(excesses_pc_after), rate = 1)
-  boot_excess_exp_geo_3d_after <- rexp(length(excesses_geo_3d_after), rate = 1)
-  boot_excess_exp_log_geo_3d_after <- rexp(length(excesses_log_geo_3d_after), rate = 1)
-  boot_excess_exp_sqrt_geo_3d_after <- rexp(length(excesses_sqrt_geo_3d_after), rate = 1)
-  
-  bootstrapped_model_quants_const_before[i,] <- quantile(boot_excess_exp_const_before, c(1:length(excesses_const_before))/(length(excesses_const_before)+1))
-  bootstrapped_model_quants_conservative_before[i,] <- quantile(boot_excess_exp_conservative_before, c(1:length(excesses_conservative_before))/(length(excesses_conservative_before)+1))
-  bootstrapped_model_quants_pc_before[i,] <- quantile(boot_excess_exp_pc_before, c(1:length(excesses_pc_before))/(length(excesses_pc_before)+1))
-  bootstrapped_model_quants_geo_3d_before[i,] <- quantile(boot_excess_exp_geo_3d_before, c(1:length(excesses_geo_3d_before))/(length(excesses_geo_3d_before)+1))
-  bootstrapped_model_quants_log_geo_3d_before[i,] <- quantile(boot_excess_exp_log_geo_3d_before, c(1:length(excesses_log_geo_3d_before))/(length(excesses_log_geo_3d_before)+1))
-  bootstrapped_model_quants_sqrt_geo_3d_before[i,] <- quantile(boot_excess_exp_sqrt_geo_3d_before, c(1:length(excesses_sqrt_geo_3d_before))/(length(excesses_sqrt_geo_3d_before)+1))
-  
-  bootstrapped_model_quants_const_after[i,] <- quantile(boot_excess_exp_const_after, c(1:length(excesses_const_after))/(length(excesses_const_after)+1))
-  bootstrapped_model_quants_conservative_after[i,] <- quantile(boot_excess_exp_conservative_after, c(1:length(excesses_conservative_after))/(length(excesses_conservative_after)+1))
-  bootstrapped_model_quants_pc_after[i,] <- quantile(boot_excess_exp_pc_after, c(1:length(excesses_pc_after))/(length(excesses_pc_after)+1))
-  bootstrapped_model_quants_geo_3d_after[i,] <- quantile(boot_excess_exp_geo_3d_after, c(1:length(excesses_geo_3d_after))/(length(excesses_geo_3d_after)+1))
-  bootstrapped_model_quants_log_geo_3d_after[i,] <- quantile(boot_excess_exp_log_geo_3d_after, c(1:length(excesses_log_geo_3d_after))/(length(excesses_log_geo_3d_after)+1))
-  bootstrapped_model_quants_sqrt_geo_3d_after[i,] <- quantile(boot_excess_exp_sqrt_geo_3d_after, c(1:length(excesses_sqrt_geo_3d_after))/(length(excesses_sqrt_geo_3d_after)+1))
-}
-
-upper_tolerance_int_const_before <- apply(bootstrapped_model_quants_const_before, 2, quantile, prob = 0.975)
-upper_tolerance_int_conservative_before <- apply(bootstrapped_model_quants_conservative_before, 2, quantile, prob = 0.975)
-upper_tolerance_int_pc_before <- apply(bootstrapped_model_quants_pc_before, 2, quantile, prob = 0.975)
-upper_tolerance_int_geo_3d_before <- apply(bootstrapped_model_quants_geo_3d_before, 2, quantile, prob = 0.975)
-upper_tolerance_int_log_geo_3d_before <- apply(bootstrapped_model_quants_log_geo_3d_before, 2, quantile, prob = 0.975)
-upper_tolerance_int_sqrt_geo_3d_before <- apply(bootstrapped_model_quants_sqrt_geo_3d_before, 2, quantile, prob = 0.975)
-
-lower_tolerance_int_const_before <- apply(bootstrapped_model_quants_const_before, 2, quantile, prob = 0.025)
-lower_tolerance_int_conservative_before <- apply(bootstrapped_model_quants_conservative_before, 2, quantile, prob = 0.025)
-lower_tolerance_int_pc_before <- apply(bootstrapped_model_quants_pc_before, 2, quantile, prob = 0.025)
-lower_tolerance_int_geo_3d_before <- apply(bootstrapped_model_quants_geo_3d_before, 2, quantile, prob = 0.025)
-lower_tolerance_int_log_geo_3d_before <- apply(bootstrapped_model_quants_log_geo_3d_before, 2, quantile, prob = 0.025)
-lower_tolerance_int_sqrt_geo_3d_before <- apply(bootstrapped_model_quants_sqrt_geo_3d_before, 2, quantile, prob = 0.025)
-
-upper_tolerance_int_const_after <- apply(bootstrapped_model_quants_const_after, 2, quantile, prob = 0.975)
-upper_tolerance_int_conservative_after <- apply(bootstrapped_model_quants_conservative_after, 2, quantile, prob = 0.975)
-upper_tolerance_int_pc_after <- apply(bootstrapped_model_quants_pc_after, 2, quantile, prob = 0.975)
-upper_tolerance_int_geo_3d_after <- apply(bootstrapped_model_quants_geo_3d_after, 2, quantile, prob = 0.975)
-upper_tolerance_int_log_geo_3d_after <- apply(bootstrapped_model_quants_log_geo_3d_after, 2, quantile, prob = 0.975)
-upper_tolerance_int_sqrt_geo_3d_after <- apply(bootstrapped_model_quants_sqrt_geo_3d_after, 2, quantile, prob = 0.975)
-
-lower_tolerance_int_const_after <- apply(bootstrapped_model_quants_const_after, 2, quantile, prob = 0.025)
-lower_tolerance_int_conservative_after <- apply(bootstrapped_model_quants_conservative_after, 2, quantile, prob = 0.025)
-lower_tolerance_int_pc_after <- apply(bootstrapped_model_quants_pc_after, 2, quantile, prob = 0.025)
-lower_tolerance_int_geo_3d_after <- apply(bootstrapped_model_quants_geo_3d_after, 2, quantile, prob = 0.025)
-lower_tolerance_int_log_geo_3d_after <- apply(bootstrapped_model_quants_log_geo_3d_after, 2, quantile, prob = 0.025)
-lower_tolerance_int_sqrt_geo_3d_after <- apply(bootstrapped_model_quants_sqrt_geo_3d_after, 2, quantile, prob = 0.025)
-
-dev.new(height=20, width=30, noRStudioGD = TRUE)
-par(mfrow=c(2,3), bg='transparent')
-
-max_plot <- max(c(upper_tolerance_int_const_before, upper_tolerance_int_geo_3d_before, upper_tolerance_int_log_geo_3d_before, upper_tolerance_int_sqrt_geo_3d_before))
-
-model_quantiles_exp <- qexp(c(1:length(excesses_const_before))/(length(excesses_const_before)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_const_before, main = "EQD threshold before changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_const_before, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_const_before, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_conservative_before))/(length(excesses_conservative_before)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_conservative_before, main = "Conservative threshold before changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_conservative_before, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_conservative_before, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_pc_before))/(length(excesses_pc_before)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_pc_before, main = "PC threshold before changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_pc_before, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_pc_before, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_geo_3d_before))/(length(excesses_geo_3d_before)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_geo_3d_before, main = "EQD V before changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_geo_3d_before, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_geo_3d_before, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_log_geo_3d_before))/(length(excesses_log_geo_3d_before)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_log_geo_3d_before, main = "EQD logV before changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_log_geo_3d_before, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_log_geo_3d_before, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_sqrt_geo_3d_before))/(length(excesses_sqrt_geo_3d_before)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_sqrt_geo_3d_before, main = "EQD sqrtV before changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_sqrt_geo_3d_before, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_sqrt_geo_3d_before, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-max_plot <- max(c(upper_tolerance_int_const_after, upper_tolerance_int_geo_3d_after, upper_tolerance_int_log_geo_3d_after, upper_tolerance_int_sqrt_geo_3d_after))
-
-model_quantiles_exp <- qexp(c(1:length(excesses_const_after))/(length(excesses_const_after)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_const_after, main = "EQD threshold after changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_const_after, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_const_after, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_conservative_after))/(length(excesses_conservative_after)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_conservative_after, main = "Conservative threshold after changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_conservative_after, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_conservative_after, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_pc_after))/(length(excesses_pc_after)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_pc_after, main = "PC threshold after changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_pc_after, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_pc_after, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_geo_3d_after))/(length(excesses_geo_3d_after)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_geo_3d_after, main = "EQD V after changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_geo_3d_after, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_geo_3d_after, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_log_geo_3d_after))/(length(excesses_log_geo_3d_after)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_log_geo_3d_after, main = "EQD logV after changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_log_geo_3d_after, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_log_geo_3d_after, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
-
-model_quantiles_exp <- qexp(c(1:length(excesses_sqrt_geo_3d_after))/(length(excesses_sqrt_geo_3d_after)+1), rate = 1)
-plot(model_quantiles_exp, sample_quantiles_exp_sqrt_geo_3d_after, main = "EQD sqrtV after changepoint", ylab ="Sample quantiles", xlab = "Model quantiles", pch=19, asp=1, ylim = c(0, max_plot))
-lines(model_quantiles_exp, upper_tolerance_int_sqrt_geo_3d_after, lty="dashed", lwd=2, col="red")
-lines(model_quantiles_exp, lower_tolerance_int_sqrt_geo_3d_after, lty="dashed", lwd=2, col="red")
-abline(a=0, b=1, lwd=2, col="grey")
 
 
 # Helper function to calculate quantiles and bootstrapped confidence intervals
