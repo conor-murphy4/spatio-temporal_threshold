@@ -505,7 +505,7 @@ get_par_ests_geo <- function(mags, thresh_fit, third_nearest_dist){
   z <- qnorm(0.975)
   lower <- gpd_fit$par - z*se
   upper <- gpd_fit$par + z*se
-  return(list(par=gpd_fit$par, lower=lower, upper=upper))
+  return(list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3)))
 }
 
 get_par_ests_step <- function(mags, threshold){
@@ -519,11 +519,11 @@ get_par_ests_step <- function(mags, threshold){
   z <- qnorm(0.975)
   lower <- gpd_fit$par - z*se
   upper <- gpd_fit$par + z*se
-  return(list(par=gpd_fit$par, lower=lower, upper=upper))
+  return(list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3)))
 }
 
 #Update below function to work for different types of threshold
-get_qq_plot <- function(mags, thresh_fit, third_nearest_dist, n_boot = 200, main = "Q-Q plot"){
+get_qq_plot_geo <- function(mags, thresh_fit, third_nearest_dist, n_boot = 200, main = "Q-Q plot"){
   threshold <- thresh_fit$thresh[1] + thresh_fit$thresh[2]*third_nearest_dist
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
   third_nearest_dist_excess <- third_nearest_dist[mags > threshold]
@@ -551,8 +551,10 @@ get_qq_plot <- function(mags, thresh_fit, third_nearest_dist, n_boot = 200, main
 get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot"){
   threshold_excess <- threshold[mags > threshold]
   excesses <- mags[mags > threshold] - threshold_excess
-  sigma_tilde <- threshold
-  transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = 0.1)
+  par_ests <- get_par_ests_step(mags = mags, threshold = threshold)$par
+  sigma_tilde <- par_ests[1] + par_ests[2]*threshold_excess
+  transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = par_ests[2])
+  
   probs <- c(1:length(excesses))/(length(excesses)+1)
   sample_quantiles <- quantile(transformed_excess, probs = probs)
   model_quantiles <- qexp(probs, rate = 1)
@@ -562,6 +564,7 @@ get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot"){
     excess_boot <- rexp(length(excesses), rate = 1)
     bootstrapped_quantiles[i,] <- quantile(excess_boot, probs = probs)
   }
+  
   upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
   lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
   plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1, main = main)

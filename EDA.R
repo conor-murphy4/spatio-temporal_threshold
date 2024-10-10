@@ -59,7 +59,7 @@ gron_eq_cat$V <- third_nearest_dist
 third_nearest_dist_3d <- distance_to_third_nearest_3d(gron_eq_cat, geophones_deepest)
 third_nearest_dist_3d_all <- distance_to_third_nearest_3d(gron_eq_cat, geophones) 
 gron_eq_cat$V_3d <- third_nearest_dist_3d
-write.csv(gron_eq_cat, "Data/Events/unrounded_after_1995_in_polygon.csv")
+write.csv(gron_eq_cat, "Data/Events/unrounded_after_1995_in_polygon.csv",row.names = FALSE)
 
 #For each year in gron_eq_cat, find the minimum V
 gron_eq_cat$Year <- as.numeric(format(as.Date(gron_eq_cat$Date), "%Y"))
@@ -75,9 +75,9 @@ points(min_V_per_year$Group.1, min_V_per_year$x, col="red",pch=19)
 #Exploratory plots of relationship between magnitudes and V
 dev.new(width=30, height=10,noRStudioGD = TRUE)
 par(mfrow=c(1,3),bg='transparent')
-# plot(gron_eq_cat$V, gron_eq_cat$Magnitude, xlab = "V", ylab = "Magnitude")
-# plot(log(gron_eq_cat$V), gron_eq_cat$Magnitude, xlab = "log(V)", ylab = "Magnitude")
-# plot(sqrt(gron_eq_cat$V), gron_eq_cat$Magnitude, xlab = "sqrt(V)", ylab = "Magnitude")
+plot(gron_eq_cat$V, gron_eq_cat$Magnitude, xlab = "V_2d", ylab = "Magnitude")
+plot(log(gron_eq_cat$V), gron_eq_cat$Magnitude, xlab = "log(V_2d)", ylab = "Magnitude")
+plot(sqrt(gron_eq_cat$V), gron_eq_cat$Magnitude, xlab = "sqrt(V_2d)", ylab = "Magnitude")
 
 #Relationship between V_3d and Magnitude
 plot(gron_eq_cat$V_3d, gron_eq_cat$Magnitude, xlab = "V_3d", ylab = "Magnitude")
@@ -86,6 +86,7 @@ plot(log(gron_eq_cat$V_3d), gron_eq_cat$Magnitude, xlab = "log(V_3d)", ylab = "M
 points(log(gron_eq_cat$V_3d), log_geo_chosen_threshold_3d, col="red", pch=19)
 plot(sqrt(gron_eq_cat$V_3d), gron_eq_cat$Magnitude, xlab = "sqrt(V_3d)", ylab = "Magnitude")
 points(sqrt(gron_eq_cat$V_3d), sqrt_geo_chosen_threshold_3d, col="red", pch=19)
+
 #Splitting gas field in two regions
 #Plotting
 # dev.new(width=10, height=10,noRStudioGD = TRUE)

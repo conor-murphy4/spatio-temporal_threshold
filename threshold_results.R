@@ -8,14 +8,17 @@ log_third_nearest_dist_3d <- log(third_nearest_dist_3d)
 sqrt_third_nearest_dist_3d <- sqrt(third_nearest_dist_3d)
 
 #Fitted thresholds
-eqd_thresh_fit <- readRDS("threshold_results/const_thresh_fit.rds")
+eqd_thresh_fit <- readRDS("threshold_results/eqd_thresh_fit.rds")
 
-eqd_threshold <- rep(const_thresh_fit$thresh, length(mags))
+eqd_threshold <- rep(eqd_thresh_fit$thresh, length(mags))
 
 conservative_threshold <- rep(1.45, length(mags))
 
 u_h_length <- which(gron_eq_cat$Date == as.Date("2015-01-06"))[1]
 piecewise_const_thresh <- c(rep(1.15, u_h_length), rep(0.76, length(mags) - u_h_length))
+
+pc_thresh_fit <- readRDS("threshold_results/pc_thresh_fit.rds")
+pc_fitted_threshold <- c(rep(pc_thresh_fit$thresh[1], u_h_length), rep(pc_thresh_fit$thresh[2], length(mags) - u_h_length))
 
 geo_thresh_fit_2d <- readRDS("threshold_results/geo_thresh_fit_2d.rds")
 
@@ -23,9 +26,9 @@ geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d.rds")
 log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d.rds")
 sqrt_geo_thresh_fit_3d <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d.rds")
 
-geo_thresh_fit_3d_un <- readRDS("threshold_results/geo_thresh_fit_3d_unconstrained.rds")
-log_geo_thresh_fit_3d_un <- readRDS("threshold_results/log_geo_thresh_fit_3d_unconstrained.rds")
-sqrt_geo_thresh_fit_3d_un <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d_unconstrained.rds")
+# geo_thresh_fit_3d_un <- readRDS("threshold_results/geo_thresh_fit_3d_unconstrained.rds")
+# log_geo_thresh_fit_3d_un <- readRDS("threshold_results/log_geo_thresh_fit_3d_unconstrained.rds")
+# sqrt_geo_thresh_fit_3d_un <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d_unconstrained.rds")
 
 # Confidence intervals for sigma_0 and xi
 
@@ -34,6 +37,8 @@ get_par_ests_step(mags, conservative_threshold)
 get_par_ests_step(mags, eqd_threshold)
 
 get_par_ests_step(mags, piecewise_const_thresh)
+
+get_par_ests_step(mags, pc_fitted_threshold)
 
 get_par_ests_geo(mags, geo_thresh_fit_2d, third_nearest_dist_2d)
 
@@ -47,42 +52,48 @@ get_par_ests_geo(mags, sqrt_geo_thresh_fit_3d, sqrt_third_nearest_dist_3d)
 set.seed(11111)
 get_eqd_value(mags, conservative_threshold, par = get_par_ests_step(mags, conservative_threshold)$par, step = TRUE)
 
-min(eqd_thresh_fit$dist)
+min(eqd_thresh_fit$dists, na.rm = TRUE)
 
 set.seed(11111)
 get_eqd_value(mags, piecewise_const_thresh, par = get_par_ests_step(mags, piecewise_const_thresh)$par, step = TRUE)
 
+min(pc_thresh_fit$dists, na.rm = TRUE)
 min(geo_thresh_fit_2d$dists, na.rm = TRUE)
 min(geo_thresh_fit_3d$dists, na.rm = TRUE)
 min(log_geo_thresh_fit_3d$dists, na.rm = TRUE)
 min(sqrt_geo_thresh_fit_3d$dists, na.rm = TRUE)
 
 #QQplots
-dev.new(height=10, width=30, noRStudioGD = TRUE)
-par(mfrow=c(1,3), bg='transparent')
-get_qq_plot(mags, eqd_thresh_fit, "EQD threshold")
+dev.new(height=20, width=40, noRStudioGD = TRUE)
+par(mfrow=c(2,4), bg='transparent')
+get_qq_plot_const(mags, eqd_threshold, main="EQD threshold")
+get_qq_plot_const(mags, conservative_threshold, main="Conservative threshold")
+get_qq_plot_const(mags, piecewise_const_thresh, main="Zak's stepped threshold")
+get_qq_plot_const(mags, pc_fitted_threshold, main="Fitted stepped threshold")
 
-get_qq_plot(mags, geo_thresh_fit_3d, third_nearest_dist_3d, main="V_3d (All)" )
-get_qq_plot(mags, log_geo_thresh_fit_3d, log_third_nearest_dist_3d, main="log(V_3d) (All)")
-get_qq_plot(mags, sqrt_geo_thresh_fit_3d, sqrt_third_nearest_dist_3d, main="sqrt(V_3d) (All)")
-
+get_qq_plot_geo(mags, geo_thresh_fit_2d, third_nearest_dist_2d, main="V_2d (All)")
+get_qq_plot_geo(mags, geo_thresh_fit_3d, third_nearest_dist_3d, main="V_3d (All)" )
+get_qq_plot_geo(mags, log_geo_thresh_fit_3d, log_third_nearest_dist_3d, main="log(V_3d) (All)")
+get_qq_plot_geo(mags, sqrt_geo_thresh_fit_3d, sqrt_third_nearest_dist_3d, main="sqrt(V_3d) (All)")
 
 # Visualising thresholds
 
 dev.new(width=20, height=10,noRStudioGD = TRUE)
 par(mfrow=c(1,2),bg='transparent')
 
-plot(gron_eq_cat$Magnitude, main = "Magnitudes over index", xlab = "Index", ylab = "Magnitude", col="grey", pch=19)
+plot(gron_eq_cat$Magnitude, xlab = "Index", ylab = "Magnitude", col="grey", pch=19)
 lines(piecewise_const_thresh, col="red", lw=2)
-lines(rep(conservative_threshold, length(mags)), col="blue", lw=2)
-lines(rep(const_thresh_fit$thresh, length(mags)), col="green", lw=2)
-legend("topright", legend=c("Piecewise constant", "Conservative", "EQD constant"), col=c("red", "blue", "green"), lty=1, cex=0.8)
+lines(pc_fitted_threshold, col="orange", lw=2)
+lines(conservative_threshold, col="blue", lw=2)
+lines(eqd_threshold, col="green", lw=2)
+legend("topright", legend=c("Zak's stepped", "Fitted stepped", "Conservative", "EQD constant"), col=c("red","orange", "blue", "green"), lty=1, cex=0.8)
 
-plot(gron_eq_cat$Magnitude, main = "Magnitudes over index", xlab = "Index", ylab = "Magnitude", col="grey", pch=19)
-lines(geo_thresh_fit_3d$thresh[[1]] + geo_thresh_fit_3d$thresh[[2]]*third_nearest_dist_3d, col="purple")
-lines(log_geo_thresh_fit_3d$thresh[[1]] + log_geo_thresh_fit_3d$thresh[[2]]*log_third_nearest_dist_3d, col="orange")
-lines(sqrt_geo_thresh_fit_3d$thresh[[1]] + sqrt_geo_thresh_fit_3d$thresh[[2]]*sqrt_third_nearest_dist_3d, col="brown")
-legend("topright", legend=c("Threshold on V_3d", "Threshold on log(V_3d)", "Threshold on sqrt(V_3d)"), col=c("purple", "orange", "brown"), lty=1, cex=0.8)
+plot(gron_eq_cat$Magnitude, xlab = "Index", ylab = "Magnitude", col="grey", pch=19)
+lines(sqrt_geo_thresh_fit_3d$thresh[[1]] + sqrt_geo_thresh_fit_3d$thresh[[2]]*sqrt_third_nearest_dist_3d, col="brown", lwd=2)
+lines(geo_thresh_fit_2d$thresh[[1]] + geo_thresh_fit_2d$thresh[[2]]*third_nearest_dist_2d, col="yellow", lwd=2)
+lines(geo_thresh_fit_3d$thresh[[1]] + geo_thresh_fit_3d$thresh[[2]]*third_nearest_dist_3d, col="purple", lwd=2)
+lines(log_geo_thresh_fit_3d$thresh[[1]] + log_geo_thresh_fit_3d$thresh[[2]]*log_third_nearest_dist_3d, col="orange", lwd=2)
+legend("topright", legend=c("Threshold on V_2D", "Threshold on V_3d", "Threshold on log(V_3d)", "Threshold on sqrt(V_3d)"), col=c("yellow","purple", "orange", "brown"), lty=1, cex=0.8)
 
 # Comparing QQplots on standard Exponential margins -----------------------
 

@@ -22,6 +22,12 @@ geo_current <- function(geophones, date){
   return(current_geo_coords)
 }
 
+geo_current_full_output <- function(geophones, date){
+  indices_current <- which(geophones$Start_date <= date & geophones$End_date >= date)
+  current_geophones <- geophones[indices_current,]
+  return(current_geophones)
+}
+
 distance_to_third_nearest <- function(eq_cat, geophones){
   third_distances <- numeric(nrow(eq_cat))
   for(i in 1:nrow(eq_cat)){

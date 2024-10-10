@@ -48,6 +48,9 @@ Geo_fin <- rbind(E,N,Z,H1,H2,HG1,HG2)
 
 Geo_fin <- Geo_fin[,-ncol(Geo_fin)]
 
+Geo_fin$Start_date <- dmy(Geo_fin$Start_date)
+Geo_fin$End_date <- dmy(Geo_fin$End_date)
+
 write.csv(Geo_fin, "Data/Geophones/Geophones_processed_03-07-2024.csv")
 
 #Removing duplicate geophones
