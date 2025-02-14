@@ -380,21 +380,21 @@ transform_to_exp <- function (y, sig, xi){
   return(std_exp)
 }
 
-GPD_LL_given_third_nearest <- function(par, excess, thresh_par, third_nearest, min_dist = 0, max_dist = 33.782){
+GPD_LL_given_V <- function(par, excess, thresh_par, V, min_dist = 0, max_dist = 33.782){
   #Current min and max distances are conservative and should be updated based on Stephen's guidance
   
   if(length(par)!=2) stop("par must be a vector of length 2")
   if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
   if (!is.numeric(excess)) stop("excess must be a vector")
-  if (!is.numeric(third_nearest)) stop("third_nearest must be vector")
-  if(length(excess) != length(third_nearest)) stop("excess and third_nearest must be the same length")
+  if (!is.numeric(V)) stop("V must be vector")
+  if(length(excess) != length(V)) stop("excess and V must be the same length")
   if(length(min_dist)!=1) stop("min_dist must be a scalar")
   if(length(max_dist)!=1) stop("max_dist must be a scalar")
   
   sigma<-par[1]
   xi<-par[2]
   
-  sigma_tilde <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*third_nearest)
+  sigma_tilde <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
   
   #Extra conditions to check for spatio-temporal model
   sigma_max <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*max_dist)
@@ -420,20 +420,20 @@ GPD_LL_given_third_nearest <- function(par, excess, thresh_par, third_nearest, m
   }
 }
 
-GPD_LL_given_third_nearest_unconstrained <- function(par, excess, thresh_par, third_nearest){
+GPD_LL_given_V_unconstrained <- function(par, excess, thresh_par, V){
   
   if(length(par)!=2) stop("par must be a vector of length 2")
   if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
   if (!is.numeric(excess)) stop("excess must be a vector")
-  if (!is.numeric(third_nearest)) stop("third_nearest must be vector")
-  if(length(excess) != length(third_nearest)) stop("excess and third_nearest must be the same length")
+  if (!is.numeric(V)) stop("V must be vector")
+  if(length(excess) != length(V)) stop("excess and V must be the same length")
   #if(length(min_dist)!=1) stop("min_dist must be a scalar")
   #if(length(max_dist)!=1) stop("max_dist must be a scalar")
   
   sigma<-par[1]
   xi<-par[2]
   
-  sigma_tilde <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*third_nearest)
+  sigma_tilde <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
   
   sigma_check <- c(sigma, sigma_tilde)
   
@@ -488,13 +488,13 @@ GPD_LL_step <- function(par, excess, thresh){
 }
 
 #Function to get par ests and confidence intervals
-get_par_ests_geo <- function(mags, thresh_fit, third_nearest_dist){
-  threshold <- thresh_fit$thresh[1] + thresh_fit$thresh[2]*third_nearest_dist
+get_par_ests_geo <- function(mags, thresh_fit, V, show_fit = TRUE){
+  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
-  third_nearest_dist_excess <- third_nearest_dist[mags > threshold]
+  V_excess <- V[mags > threshold]
   mle0 <- mean(excesses)
-  gpd_fit <- optim(GPD_LL_given_third_nearest, excess = excesses, par = c(mle0,0.1), control = list(fnscale = -1), thresh_par=thresh_fit$thresh, 
-                   third_nearest = third_nearest_dist_excess, min_dist = min(third_nearest_dist), max_dist = max(third_nearest_dist), hessian = TRUE)
+  gpd_fit <- optim(GPD_LL_given_V, excess = excesses, par = c(mle0,0.1), control = list(fnscale = -1), thresh_par=thresh_fit$thresh_par, 
+                   V = V_excess, min_dist = min(V), max_dist = max(V), hessian = TRUE)
   check <- gpd_fit$par[1] == thresh_fit$par[1] & gpd_fit$par[2] == thresh_fit$par[2]
   if(!check){
     stop("Parameter estimates don't agree")
@@ -505,7 +505,13 @@ get_par_ests_geo <- function(mags, thresh_fit, third_nearest_dist){
   z <- qnorm(0.975)
   lower <- gpd_fit$par - z*se
   upper <- gpd_fit$par + z*se
-  return(list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3)))
+  if(show_fit){
+    output <- list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3), fit=gpd_fit)
+  }
+  else{
+    output <- list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3))
+  }
+  return(output)
 }
 
 get_par_ests_step <- function(mags, threshold){
@@ -523,10 +529,10 @@ get_par_ests_step <- function(mags, threshold){
 }
 
 #Update below function to work for different types of threshold
-get_qq_plot_geo <- function(mags, thresh_fit, third_nearest_dist, n_boot = 200, main = "Q-Q plot"){
-  threshold <- thresh_fit$thresh[1] + thresh_fit$thresh[2]*third_nearest_dist
+get_qq_plot_geo <- function(mags, thresh_fit, V, n_boot = 200, main = "Q-Q plot"){
+  threshold <- thresh_fit$thresh[1] + thresh_fit$thresh[2]*V
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
-  third_nearest_dist_excess <- third_nearest_dist[mags > threshold]
+  V_excess <- V[mags > threshold]
   sigma_tilde <- thresh_fit$par[1] + thresh_fit$par[2]*threshold[mags > threshold]
   transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = thresh_fit$par[2])
   probs <- c(1:length(excesses))/(length(excesses)+1)
@@ -573,11 +579,12 @@ get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot"){
   lines(model_quantiles, lower, col = "red", lwd=2, lty="dashed")
 }
 
-get_eqd_value <- function(mags, threshold, par, num_boot = 200, m = 500, step = FALSE){
+get_eqd_value <- function(mags, threshold, par, SEED = 11111, num_boot = 200, m = 500, step = FALSE){
   sigma <- par[1]
   xi <- par[2]
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
   distances <- numeric(num_boot)
+  set.seed(SEED)
   for (j in 1:num_boot) {
     sample_indices <- sample(c(1:length(excesses)), length(excesses), replace = TRUE)
     boot_excesses <- excesses[sample_indices]
@@ -599,4 +606,154 @@ get_eqd_value <- function(mags, threshold, par, num_boot = 200, m = 500, step = 
   }
   eqd_value <- mean(distances)
   return(eqd_value)
+}
+
+
+GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics, max_dist = 33.782, min_ics = 0){
+  # Max distance taken above as length of gas field while min_ics is taken as 0, may need updating
+  
+  if(length(par)!=3) stop("par must be a vector of length 3")
+  if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
+  if (!is.numeric(excess)) stop("excess must be a vector")
+  if (!is.numeric(V)) stop("V must be vector")
+  if (!is.numeric(ics)) stop("ics must be vector")
+  if(length(excess) != length(V)) stop("excess and V must be the same length")
+  if(length(excess) != length(ics)) stop("excess and ics must be the same length")
+  if(length(max_dist)!=1) stop("max_dist must be a scalar")
+  if(length(min_ics)!=1) stop("min_ics must be a scalar")
+  
+  sigma_par <- par[1:2]
+  xi <- par[3]
+  
+  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
+  
+  sigma_tilde <- sigma_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
+  
+  #Extra conditions to check for spatio-temporal model 
+  sigma_min <- sigma_par[1] + sigma_par[2]*min_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*max_dist)
+  
+  sigma_check <- c(sigma_ics, sigma_min, sigma_tilde)
+  
+  if(all(sigma_check>0) & xi > -0.9){
+    if(abs(xi)<1e-10){
+      return(-sum(log(sigma_tilde))-sum(excess/sigma_tilde))
+    }
+    else{
+      if(all(1+(xi*excess)/sigma_tilde > 0)){
+        return(-sum(log(sigma_tilde))-(1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
+      }
+      else{
+        return(-1e6)
+      }
+    }
+  }
+  else{
+    return(-1e7)
+  }
+}
+
+GPD_LL_given_V_ICS_unconstrained <- function(par, excess, thresh_par, V, ics){
+  
+  if(length(par)!=3) stop("par must be a vector of length 3")
+  if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
+  if (!is.numeric(excess)) stop("excess must be a vector")
+  if (!is.numeric(V)) stop("V must be vector")
+  if (!is.numeric(ics)) stop("ics must be vector")
+  if(length(excess) != length(V)) stop("excess and V must be the same length")
+  if(length(excess) != length(ics)) stop("excess and ics must be the same length")
+  
+  sigma_par <- par[1:2]
+  xi <- par[3]
+  
+  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
+  
+  sigma_tilde <- sigma_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
+  
+  sigma_check <- c(sigma_ics, sigma_tilde)
+  
+  if(all(sigma_check > 0) & xi > -0.9){
+    if(abs(xi) < 1e-10){
+      return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))
+    }
+    else{
+      if(all(1+(xi*excess)/sigma_tilde > 0)){
+        return(-sum(log(sigma_tilde)) - (1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
+      }
+      else{
+        return(-1e6)
+      }
+    }
+  }
+  else{
+    return(-1e7)
+  }
+}
+
+GPD_LL_ICS_constant_thresh <- function(par, excess, ics, thresh){
+  
+  if(length(par)!=3) stop("par must be a vector of length 3")
+  if (!is.numeric(excess)) stop("excess must be a vector")
+  if (!is.numeric(ics)) stop("ics must be vector")
+  if(length(excess) != length(ics)) stop("excess and ics must be the same length")
+  
+  sigma_par <- par[1:2]
+  xi <- par[3]
+  
+  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
+  
+  sigma_tilde <- sigma_ics + xi*(thresh)
+  
+  sigma_check <- c(sigma_ics, sigma_tilde)
+  
+  if(all(sigma_check > 0)){
+    if(abs(xi) < 1e-10){
+      return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))
+    }
+    else{
+      if(all(1+(xi*excess)/sigma_tilde > 0)){
+        return(-sum(log(sigma_tilde)) - (1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
+      }
+      else{
+        return(-1e6)
+      }
+    }
+  }
+  else{
+    return(-1e7)
+  }
+}
+
+
+GPD_LL_ICS_constant_thresh_const_shape <- function(par, excess, ics, thresh, shape){
+  
+  if(length(par)!=2) stop("par must be a vector of length 2")
+  if (!is.numeric(excess)) stop("excess must be a vector")
+  if (!is.numeric(ics)) stop("ics must be vector")
+  if(length(excess) != length(ics)) stop("excess and ics must be the same length")
+  
+  sigma_par <- par[1:2]
+  xi <- shape
+  
+  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
+  
+  sigma_tilde <- sigma_ics + xi*(thresh)
+  
+  sigma_check <- c(sigma_ics, sigma_tilde)
+  
+  if(all(sigma_check > 0)){
+    if(abs(xi) < 1e-10){
+      return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))
+    }
+    else{
+      if(all(1+(xi*excess)/sigma_tilde > 0)){
+        return(-sum(log(sigma_tilde)) - (1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
+      }
+      else{
+        return(-1e6)
+      }
+    }
+  }
+  else{
+    return(-1e7)
+  }
 }

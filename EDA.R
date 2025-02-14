@@ -1,16 +1,17 @@
 library(pracma)
 
-source("src/distance_to_third_nearest_geo.R")
+source("src/distance_to_nearest_geo.R")
 
 gron_outline <- read.csv('Data/Geophones/Groningen_Field_outline.csv', header=T)
 gron_polygon <- read.table('Data/Geophones/polygon_for_groningen_earthquakes.txt', header=T)
 geophones <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_without_duplicates.csv", header=T, row.names = 1)
 geophones_deepest <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_deepest_only.csv", header=T, row.names = 1)
 gron_eq_cat_all_netherlands <- read.csv("Data/Events/unrounded_after_geophone_start.csv", header=T, row.names = 1)
-gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
 gron_eq_cat_all <- read.csv("Data/Events/unrounded_after_geophone_start_in_polygon_with_V_3d.csv", header=T)
 gron_eq_cat_old <- read.csv("Data/Events/2022-04-12_15-09-25_cat.csv", header=T)
+gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
 
+gron_eq_cat_all[24,]
 # included_geos <- what_geos(gron_eq_cat, geophones)
 
 #Restricting EQs to within the groningen polygon
@@ -18,9 +19,13 @@ gron_eq_cat_old <- read.csv("Data/Events/2022-04-12_15-09-25_cat.csv", header=T)
 # write.csv(gron_eq_cat_in_polygon, "Data/Events/unrounded_after_geophone_start_in_polygon.csv")
 
 #Restricting EQs past 1995
-# gron_eq_cat_past_1995 <- gron_eq_cat[as.Date(gron_eq_cat$Date) > as.Date("1995-01-01"),]
+# gron_eq_cat_past_1995 <- gron_eq_cat[as.Date(gron_eq_cat$Date) > "1995-04-01",]
+# gron_eq_cat[gron_eq_cat$V_3d > 250,]
 # write.csv(gron_eq_cat_past_1995, "Data/Events/unrounded_after_1995_in_polygon.csv")
 
+
+plot(as.Date(gron_eq_cat_all$Date[gron_eq_cat_all$Date > "1995-04-01"]), gron_eq_cat_all$Magnitude[gron_eq_cat_all$Date > "1995-04-01"])
+head(gron_eq_cat)
 #Comparing old and new datasets
 
 # Plotting both catalogues
@@ -53,8 +58,17 @@ max(gron_outline$X) - min(gron_outline$X)
 
 #Finding distance to third nearest geophone for observed events in gron_eq_cat
 
-third_nearest_dist <- distance_to_third_nearest(gron_eq_cat, geophones_deepest)
-gron_eq_cat$V <- third_nearest_dist
+# third_nearest_dist <- distance_to_third_nearest(gron_eq_cat, geophones_deepest)
+gron_eq_cat$V_1 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 1)
+gron_eq_cat$V_2 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 2)
+gron_eq_cat$V_3 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 3)
+gron_eq_cat$V_4 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 4)
+
+gron_eq_cat$V_2d <- gron_eq_cat$V
+#remove columns V-old, V_3d_old, V, V_3d
+gron_eq_cat <- gron_eq_cat[,-which(names(gron_eq_cat) %in% c("V_old", "V_3d_old", "V", "V_3d"))]
+head(gron_eq_cat)
+write.csv(gron_eq_cat, "Data/Events/unrounded_after_1995_in_polygon.csv",row.names = FALSE)
 
 third_nearest_dist_3d <- distance_to_third_nearest_3d(gron_eq_cat, geophones_deepest)
 third_nearest_dist_3d_all <- distance_to_third_nearest_3d(gron_eq_cat, geophones) 
@@ -206,3 +220,53 @@ lines(as.Date(date_sequence), dist3_3d, col="purple")
 lines(as.Date(date_sequence), dist4_3d, col="orange")
 lines(as.Date(date_sequence), dist5_3d, col="yellow")
 legend("topright", legend=c("Mean distance in polygon", "Mean distance in outline"), col=c("black", "blue"), lty=1, lwd=2)
+
+
+# EDA with ICS
+conservative <- 1.45
+eqd_const <- 1.08
+u_h_length <- which(gron_eq_cat$Date == as.Date("2015-01-06"))[1]
+pc_threshold <- c(rep(1.15, u_h_length), rep(0.76, length(mags) - u_h_length))
+conserv_ind <- which(gron_eq_cat$Magnitude > conservative)
+eqd_ind <- which(gron_eq_cat$Magnitude > eqd_const)
+pc_ind <- which(gron_eq_cat$Magnitude > pc_threshold)
+plot(gron_eq_cat$ICS, gron_eq_cat$Magnitude, xlab="ICS", ylab="Magnitude", col = "grey")
+points(gron_eq_cat$ICS[pc_ind], gron_eq_cat$Magnitude[pc_ind], col="blue")
+points(gron_eq_cat$ICS[eqd_ind], gron_eq_cat$Magnitude[eqd_ind])
+points(gron_eq_cat$ICS[conserv_ind], gron_eq_cat$Magnitude[conserv_ind], col="red")
+
+# Add loess mean estimate to plot
+loess_mean <- loess(gron_eq_cat$Magnitude ~ gron_eq_cat$ICS, span=0.5)
+loess_mean_eqd <- loess(gron_eq_cat$Magnitude[eqd_ind] ~ gron_eq_cat$ICS[eqd_ind], span=0.5)
+loess_mean_conserv <- loess(gron_eq_cat$Magnitude[conserv_ind] ~ gron_eq_cat$ICS[conserv_ind], span=0.5)
+loess_mean_pc <- loess(gron_eq_cat$Magnitude[pc_ind] ~ gron_eq_cat$ICS[pc_ind], span=0.5)
+loess_mean_pred <- predict(loess_mean)
+loess_mean_eqd_pred <- predict(loess_mean_eqd)
+loess_mean_conserv_pred <- predict(loess_mean_conserv)
+loess_mean_pc_pred <- predict(loess_mean_pc)
+points(gron_eq_cat$ICS, loess_mean_pred, col="grey", pch=19)
+points(gron_eq_cat$ICS[pc_ind], loess_mean_pc_pred, col="blue", pch=19)
+points(gron_eq_cat$ICS[eqd_ind], loess_mean_eqd_pred, pch=19)
+points(gron_eq_cat$ICS[conserv_ind], loess_mean_conserv_pred, col="red", pch=19)
+legend("topleft", legend=c("All events", "PC threshold", "EQD threshold", "Conservative threshold"), col=c("grey", "blue", "black", "red"), pch=19)
+
+# Testing new LL with ICS
+
+mags <- gron_eq_cat$Magnitude
+thresh_exam <- c(1, 0.04)
+threshold <- thresh_exam[1] + thresh_exam[2]*sqrt(gron_eq_cat$V_1)
+excesses_exam <- mags[mags > threshold] - threshold[mags > threshold]
+initial_params <- c(sqrt_geo_thresh_fit[[1]]$par[1], 0, sqrt_geo_thresh_fit[[1]]$par[2])
+gpd_ics_fit <- optim(GPD_LL_given_V_ICS_unconstrained, par=initial_params, excess=excesses_exam, thresh_par=thresh_exam, V=sqrt(gron_eq_cat$V_1[mags>threshold]), 
+                     ICS = gron_eq_cat$ICS[mags>threshold], control = list(fnscale=-1) )
+gpd_ics_fit
+
+gpd_V_fit <- optim(GPD_LL_given_V, par=initial_params, excess=excesses_exam, thresh_par=thresh_exam, V=sqrt(gron_eq_cat$V_1[mags>threshold]), min_dist = min(sqrt(gron_eq_cat$V_1[mags>threshold])), max_dist = max(sqrt(gron_eq_cat$V_1[mags>threshold])) )
+gpd_V_fit
+
+sqrt_geo_thresh_fit[[1]]
+
+# ICS vs V1
+
+plot(gron_eq_cat$ICS, gron_eq_cat$V_1, xlab="ICS", ylab="V_1", col="grey",pch=19)
+points(gron_eq_cat$ICS[conserv_ind], gron_eq_cat$V_1[conserv_ind], pch=19)

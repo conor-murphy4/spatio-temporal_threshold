@@ -1,6 +1,8 @@
 source("src/helper_functions.R")
 
 gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
+#Excluding largest V
+gron_eq_cat <- gron_eq_cat[gron_eq_cat$V_3d <= 250,]
 mags <- gron_eq_cat$Magnitude
 third_nearest_dist_2d <- gron_eq_cat$V
 third_nearest_dist_3d <- gron_eq_cat$V_3d
@@ -8,23 +10,23 @@ log_third_nearest_dist_3d <- log(third_nearest_dist_3d)
 sqrt_third_nearest_dist_3d <- sqrt(third_nearest_dist_3d)
 
 #Fitted thresholds
-eqd_thresh_fit <- readRDS("threshold_results/eqd_thresh_fit.rds")
+eqd_thresh_fit <- readRDS("threshold_results/eqd_thresh_fit_without_largeV.rds")
 
 eqd_threshold <- rep(eqd_thresh_fit$thresh, length(mags))
 
 conservative_threshold <- rep(1.45, length(mags))
 
-u_h_length <- which(gron_eq_cat$Date == as.Date("2015-01-06"))[1]
-piecewise_const_thresh <- c(rep(1.15, u_h_length), rep(0.76, length(mags) - u_h_length))
+change_index <- which(gron_eq_cat$Date == "2015-01-06")[1]
+piecewise_const_thresh <- c(rep(1.15, change_index), rep(0.76, length(mags) - change_index))
 
-pc_thresh_fit <- readRDS("threshold_results/pc_thresh_fit.rds")
-pc_fitted_threshold <- c(rep(pc_thresh_fit$thresh[1], u_h_length), rep(pc_thresh_fit$thresh[2], length(mags) - u_h_length))
+pc_thresh_fit <- readRDS("threshold_results/pc_thresh_fit_without_largeV.rds")
+pc_fitted_threshold <- c(rep(pc_thresh_fit$thresh[1], change_index), rep(pc_thresh_fit$thresh[2], length(mags) - change_index))
 
-geo_thresh_fit_2d <- readRDS("threshold_results/geo_thresh_fit_2d.rds")
+geo_thresh_fit_2d <- readRDS("threshold_results/geo_thresh_fit_2d_without_largeV.rds")
 
-geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d.rds")
-log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d.rds")
-sqrt_geo_thresh_fit_3d <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d.rds")
+geo_thresh_fit_3d <- readRDS("threshold_results/geo_thresh_fit_3d_without_largeV.rds")
+log_geo_thresh_fit_3d <- readRDS("threshold_results/log_geo_thresh_fit_3d_without_largeV.rds")
+sqrt_geo_thresh_fit_3d <- readRDS("threshold_results/sqrt_geo_thresh_fit_3d_without_largeV.rds")
 
 # geo_thresh_fit_3d_un <- readRDS("threshold_results/geo_thresh_fit_3d_unconstrained.rds")
 # log_geo_thresh_fit_3d_un <- readRDS("threshold_results/log_geo_thresh_fit_3d_unconstrained.rds")
@@ -71,10 +73,10 @@ get_qq_plot_const(mags, conservative_threshold, main="Conservative threshold")
 get_qq_plot_const(mags, piecewise_const_thresh, main="Zak's stepped threshold")
 get_qq_plot_const(mags, pc_fitted_threshold, main="Fitted stepped threshold")
 
-get_qq_plot_geo(mags, geo_thresh_fit_2d, third_nearest_dist_2d, main="V_2d (All)")
-get_qq_plot_geo(mags, geo_thresh_fit_3d, third_nearest_dist_3d, main="V_3d (All)" )
-get_qq_plot_geo(mags, log_geo_thresh_fit_3d, log_third_nearest_dist_3d, main="log(V_3d) (All)")
-get_qq_plot_geo(mags, sqrt_geo_thresh_fit_3d, sqrt_third_nearest_dist_3d, main="sqrt(V_3d) (All)")
+get_qq_plot_geo(mags, geo_thresh_fit_2d, third_nearest_dist_2d, main="V_2d")
+get_qq_plot_geo(mags, geo_thresh_fit_3d, third_nearest_dist_3d, main="V_3d" )
+get_qq_plot_geo(mags, log_geo_thresh_fit_3d, log_third_nearest_dist_3d, main="log(V_3d)")
+get_qq_plot_geo(mags, sqrt_geo_thresh_fit_3d, sqrt_third_nearest_dist_3d, main="sqrt(V_3d)")
 
 # Visualising thresholds
 
@@ -149,8 +151,8 @@ prep_data <- function(gron_eq_cat, start, end, thresh_fit, dist_col) {
 }
 
 # Prepare data for before and after changepoint
-data_before <- prep_data(gron_eq_cat, 1, u_h_length, geo_thresh_fit_3d, "V_3d")
-data_after <- prep_data(gron_eq_cat, u_h_length + 1, nrow(gron_eq_cat), geo_thresh_fit_3d, "V_3d")
+data_before <- prep_data(gron_eq_cat, 1, change_index, geo_thresh_fit_3d, "V_3d")
+data_after <- prep_data(gron_eq_cat, change_index + 1, nrow(gron_eq_cat), geo_thresh_fit_3d, "V_3d")
 
 # Bootstrapped quantiles
 n_boot <- 200
