@@ -1,4 +1,14 @@
 
+covariates <- read.csv("Data/covariates/covariates_1995-2024.csv")
+gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
+gron_polygon <- read.table('Data/Geophones/polygon_for_groningen_earthquakes.txt', header=T)
+
+range(covariates$Easting)
+range(covariates$Northing)
+range(gron_eq_cat$Easting)
+range(gron_eq_cat$Northing)
+range(gron_polygon$POINT_X)
+range(gron_polygon$POINT_Y)
 Poisson_process_LL <- function(par, data, covariates, threshold_obs, thresh_fit){
   # par: parameter vector
   # data: gron_eq_cat including observed locations/mags/covariates
@@ -54,6 +64,21 @@ resulting_intensity <- function(opt_PP, covariates, thresh_fit){
   return(intensity_above_threshold)
 }
 
-covariates$intensity_above_threshold_V1 <- resulting_intensity(opt_PP, covariates, thresh_fit_V1_ics)
+prob_ex <- function(covariates, thresh_fit){
+  sigma_var_0 <- thresh_fit$par[1] + thresh_fit$par[2] * covariates$ICS
+  prob_ex <- (1 + thresh_fit$par[3] * (covariates$threshold) / sigma_var_0)^(-1 / thresh_fit$par[3])
+  prob_ex[1 + thresh_fit$par[3] * (covariates$threshold) / sigma_var_0 < 0] <- 0
+  return(prob_ex)
+}
 
-# write.csv(covariates, "Data/covariates/covariates_1995-2024.csv", row.names = F) 
+covariates$intensity_above_threshold_V1 <- resulting_intensity(opt_PP, covariates, thresh_fit_V1_ics)
+covariates$prob_exceedance_V1 <- prob_ex(covariates, thresh_fit_V1_ics)
+
+grid_box_E <- (max(unique(covariates$Easting))-min(unique(covariates$Easting)))/length(unique(covariates$Easting))
+grid_box_N <- (max(unique(covariates$Northing))-min(unique(covariates$Northing)))/length(unique(covariates$Northing))
+grid_box_area <- grid_box_E/1000* grid_box_N/1000
+
+covariates$intensity_above_threshold_V1_per_km2 <- covariates$intensity_above_threshold_V1/grid_box_area
+write.csv(covariates, "Data/covariates/covariates_1995-2024.csv", row.names = F) 
+
+

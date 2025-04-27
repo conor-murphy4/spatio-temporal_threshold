@@ -514,6 +514,37 @@ get_par_ests_geo <- function(mags, thresh_fit, V, show_fit = TRUE){
   return(output)
 }
 
+
+get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, min_ics = 0, max_dist = 33.782, show_fit = TRUE){
+  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
+  excesses <- mags[mags > threshold] - threshold[mags > threshold]
+  V_excess <- V[mags > threshold]
+  ics_excess <- ics[mags > threshold]
+  mle0 <- mean(excesses)
+  gpd_fit <- optim(GPD_LL_given_V_ICS, excess = excesses, par = c(mle0,0,0.1), control = list(fnscale = -1), thresh_par=thresh_fit$thresh_par, 
+                   V = V_excess, ics = ics_excess, min_ics = min_ics, max_dist = max_dist , hessian = TRUE)
+  check <- gpd_fit$par[1] == thresh_fit$par[1] & gpd_fit$par[2] == thresh_fit$par[2] & gpd_fit$par[3] == thresh_fit$par[3]
+  if(!check){
+    print(gpd_fit$par)
+    stop("Parameter estimates don't agree")
+  }
+  hessian <- gpd_fit$hessian
+  cov_matrix <- solve(-1*hessian)
+  se <- sqrt(diag(cov_matrix))
+  z <- qnorm(0.975)
+  lower <- gpd_fit$par - z*se
+  upper <- gpd_fit$par + z*se
+  if(show_fit){
+    output <- list(par=gpd_fit$par, CI_beta0=round(c(lower[1], upper[1]), 3), CI_beta1=round(c(lower[2], upper[2]),3), 
+                   CI_shape = round(c(lower[3], upper[3]),3), fit=gpd_fit)
+  }
+  else{
+    output <- list(par=gpd_fit$par,CI_beta0=round(c(lower[1], upper[1]), 3), CI_beta1=round(c(lower[2], upper[2]),3),
+                   CI_shape = round(c(lower[3], upper[3]),3))
+  }
+  return(output)
+}
+
 get_par_ests_step <- function(mags, threshold){
   threshold_excess <- threshold[mags > threshold]
   excesses <- mags[mags > threshold] - threshold_excess
@@ -526,6 +557,21 @@ get_par_ests_step <- function(mags, threshold){
   lower <- gpd_fit$par - z*se
   upper <- gpd_fit$par + z*se
   return(list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3)))
+}
+
+get_par_ests_const_ics <- function(mags, threshold,ics){
+  threshold_excess <- threshold[mags > threshold]
+  ics_excess <- ics[mags > threshold]
+  excesses <- mags[mags > threshold] - threshold_excess
+  mle0 <- mean(excesses)
+  gpd_fit <- optim(GPD_LL_ICS_constant_thresh, excess = excesses, par = c(mle0,0,0.1), control = list(fnscale = -1), thresh=threshold_excess, ics = ics_excess, hessian = TRUE)
+  hessian <- gpd_fit$hessian
+  cov_matrix <- solve(-1*hessian)
+  se <- sqrt(diag(cov_matrix))
+  z <- qnorm(0.975)
+  lower <- gpd_fit$par - z*se
+  upper <- gpd_fit$par + z*se
+  return(list(par=gpd_fit$par, CI_beta0=round(c(lower[1], upper[1]), 3), CI_beta1=round(c(lower[2], upper[2]),3), CI_shape=round(c(lower[3], upper[3]),3) ))
 }
 
 #Update below function to work for different types of threshold
@@ -689,7 +735,7 @@ GPD_LL_given_V_ICS_unconstrained <- function(par, excess, thresh_par, V, ics){
   }
 }
 
-GPD_LL_ICS_constant_thresh <- function(par, excess, ics, thresh){
+GPD_LL_ICS_constant_thresh <- function(par, excess, ics, thresh, min_ics = 0){
   
   if(length(par)!=3) stop("par must be a vector of length 3")
   if (!is.numeric(excess)) stop("excess must be a vector")
@@ -703,7 +749,9 @@ GPD_LL_ICS_constant_thresh <- function(par, excess, ics, thresh){
   
   sigma_tilde <- sigma_ics + xi*(thresh)
   
-  sigma_check <- c(sigma_ics, sigma_tilde)
+  sigma_min <- sigma_par[1] + sigma_par[2]*min_ics
+  
+  sigma_check <- c(sigma_min, sigma_ics, sigma_tilde)
   
   if(all(sigma_check > 0)){
     if(abs(xi) < 1e-10){

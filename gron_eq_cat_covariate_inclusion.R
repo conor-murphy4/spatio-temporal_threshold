@@ -13,10 +13,10 @@ gron_eq_cat_all <- read.csv("Data/Events/unrounded_after_geophone_start_in_polyg
 gron_eq_cat_old <- read.csv("Data/Events/2022-04-12_15-09-25_cat.csv", header=T)
 
 # Distance to 1st, 2nd, 3rd, and 4th nearest geophone
-gron_eq_cat$V_1 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 1)
-gron_eq_cat$V_2 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 2)
-gron_eq_cat$V_3 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 3)
-gron_eq_cat$V_4 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 4)
+# gron_eq_cat$V_1 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 1)
+# gron_eq_cat$V_2 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 2)
+# gron_eq_cat$V_3 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 3)
+# gron_eq_cat$V_4 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 4)
 
 #ICS
 # ics <- read.csv("Data/covariates/data_ics.csv", header=T)
@@ -51,26 +51,25 @@ for(monthyear in unique(gron_eq_cat$MonthYear)){
   gron_eq_cat$ICS[eq_cat_ind] <- extracted_ics
 }
 
-head(gron_eq_cat)
 #write.csv(gron_eq_cat, "Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", row.names = F)
 
-min(covariates$Date)
 
 # Covariate dataset -------------------------------------------------------
 covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
-covariates$V1 <- distance_to_nearest(covariates, geophones_deepest, 1)
-covariates$V2 <- distance_to_nearest(covariates, geophones_deepest, 2)
-covariates$V3 <- distance_to_nearest(covariates, geophones_deepest, 3)
-covariates$V4 <- distance_to_nearest(covariates, geophones_deepest, 4)
 
-
-covariates <- covariates[covariates$Date >= "1995-04-06",]
-
-write.csv(covariates, "Data/covariates/covariates_1995-2024.csv", row.names = F)
-geophones_deepest[which(geophones_deepest$Start_date <= "1995-04-01" & geophones_deepest$End_date >= "1995-04-01"),]
+# covariates$V1 <- distance_to_nearest(covariates, geophones_deepest, 1)
+# covariates$V2 <- distance_to_nearest(covariates, geophones_deepest, 2)
+# covariates$V3 <- distance_to_nearest(covariates, geophones_deepest, 3)
+# covariates$V4 <- distance_to_nearest(covariates, geophones_deepest, 4)
+# 
+# 
+# covariates <- covariates[covariates$Date >= "1995-04-06",]
+# 
+# write.csv(covariates, "Data/covariates/covariates_1995-2024.csv", row.names = F)
 
 # ------ Space-time fields of threshold, GPD parameters, summaries
-thresh_fit_geo_ics <- readRDS("threshold_results/thresh_fit_V1_ics.rds")
+# Using V1 threshold fit as example, will need to be repeated for best choice
+thresh_fit_V1_ics <- readRDS("threshold_results/geo_thresh_fit_V1with_ics.rds")
 covariates$threshold <- thresh_fit_geo_ics$thresh_par[1] + thresh_fit_geo_ics$thresh_par[2] * covariates$V1
 covariates$sigma <- thresh_fit_geo_ics$par[1] + thresh_fit_geo_ics$par[2] * covariates$ICS + thresh_fit_geo_ics$par[3] * covariates$threshold 
 covariates$xi <- rep(thresh_fit_geo_ics$par[3], nrow(covariates))
@@ -107,6 +106,7 @@ sigmoid_threshold <- function(x, vr = 1.15, vl = 0.76, mu, zeta){
 
 # Threshold on observed events
 thresh_fit_V1_ics <- readRDS("threshold_results/geo_thresh_fit_V1with_ics.rds")
+
 thresh_fit_V2_ics <- readRDS("threshold_results/geo_thresh_fit_V2with_ics.rds")
 thresh_fit_V3_ics <- readRDS("threshold_results/geo_thresh_fit_V3with_ics.rds")
 thresh_fit_V4_ics <- readRDS("threshold_results/geo_thresh_fit_V4with_ics.rds")
@@ -156,11 +156,13 @@ min(thresh_fit_sqrtV4_ics$dists, na.rm = T)
 ##################################-------------------------------------------------------------------
 
 threshold_obs_V1 <- thresh_fit_V1_ics$thresh_par[1] + thresh_fit_V1_ics$thresh_par[2] * gron_eq_cat$V_1
+
 threshold_obs_V2 <- thresh_fit_V2_ics$thresh_par[1] + thresh_fit_V2_ics$thresh_par[2] * gron_eq_cat$V_2
 threshold_obs_V3 <- thresh_fit_V3_ics$thresh_par[1] + thresh_fit_V3_ics$thresh_par[2] * gron_eq_cat$V_3
 threshold_obs_V4 <- thresh_fit_V4_ics$thresh_par[1] + thresh_fit_V4_ics$thresh_par[2] * gron_eq_cat$V_4
 
 gron_eq_cat_exceed_V1 <- gron_eq_cat[gron_eq_cat$Magnitude > threshold_obs_V1,] 
+
 gron_eq_cat_exceed_V2 <- gron_eq_cat[gron_eq_cat$Magnitude > threshold_obs_V2,]
 gron_eq_cat_exceed_V3 <- gron_eq_cat[gron_eq_cat$Magnitude > threshold_obs_V3,]
 gron_eq_cat_exceed_V4 <- gron_eq_cat[gron_eq_cat$Magnitude > threshold_obs_V4,]
@@ -238,14 +240,30 @@ for(year in chosen_years){
   plot_df <- data.frame(Easting = numeric(0), Northing = numeric(0), avg_intensity= numeric(0))
   for(easting in unique(current_covariates$Easting)){
     for(northing in unique(current_covariates$Northing)){
-      plot_df <- rbind(plot_df, data.frame(Easting=easting, Northing = northing, avg_intensity = mean(current_covariates$intensity_above_threshold_V1[current_covariates$Easting == easting & current_covariates$Northing == northing])))
+      plot_df <- rbind(plot_df, data.frame(Easting=easting, Northing = northing, avg_intensity = mean(current_covariates$intensity_above_threshold_V1_per_km2[current_covariates$Easting == easting & current_covariates$Northing == northing])))
     }
   }
   plot_df <- plot_df[complete.cases(plot_df),]
-  print(ggplot(plot_df, aes(x = Easting, y = Northing, fill = avg_intensity)) + geom_tile() + scale_fill_gradient(low = "blue", high = "red") + ggtitle(paste("Average intensity above V1 threshold and exceedance locations in", year)) +
+  print(ggplot(plot_df, aes(x = Easting, y = Northing, fill = avg_intensity)) + geom_tile() + scale_fill_gradient(low = "blue", high = "red") + ggtitle(paste("Average intensity above V1 threshold per km2 and exceedance locations in", year)) +
           geom_point(data = current_exceedances, aes(x = Easting, y = Northing), size=2, shape=19, fill = "black"))
 }
 
+#Average prob of exceeding plots for different years
+chosen_years <- c("2000", "2005", "2010", "2015", "2020")
+for(year in chosen_years){
+  current_covariates <- covariates[covariates$Year == year,]
+  current_exceedances <- gron_eq_cat_exceed_V1[gron_eq_cat_exceed_V1$Year == year,]
+  #Make an empty dataframe to store the average threshold for each location
+  plot_df <- data.frame(Easting = numeric(0), Northing = numeric(0), prob_ex= numeric(0))
+  for(easting in unique(current_covariates$Easting)){
+    for(northing in unique(current_covariates$Northing)){
+      plot_df <- rbind(plot_df, data.frame(Easting=easting, Northing = northing, prob_ex = mean(current_covariates$prob_exceedance_V1[current_covariates$Easting == easting & current_covariates$Northing == northing])))
+    }
+  }
+  plot_df <- plot_df[complete.cases(plot_df),]
+  print(ggplot(plot_df, aes(x = Easting, y = Northing, fill = prob_ex)) + geom_tile() + scale_fill_gradient(low = "blue", high = "green") + ggtitle(paste("Average probability of exceedance of V1 threshold and exceedance locations in", year)) +
+          geom_point(data = current_exceedances, aes(x = Easting, y = Northing), size=2, shape=19, fill = "black"))
+}
 
 # Split according to two modes of EQ activity -----------------------------
 max_dist <- max(covariates$V1)
@@ -297,6 +315,7 @@ p_value
 
 # Testing for inclusion of ICS --------------------------------------------
 # Fitting with ICS above conservative threshold
+mags <- gron_eq_cat$Magnitude
 conservative_threshold <- rep(1.45, length(mags))
 excess_threshold <- conservative_threshold[mags > conservative_threshold]
 excesses_conserv <- mags[mags > conservative_threshold] - excess_threshold

@@ -37,7 +37,9 @@ plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, main = "Magnitudes over t
 plot(gron_eq_cat$Magnitude, main = "Magnitudes over index", xlab = "Index", ylab = "Magnitude")
 
 #Rounded to 1 d.p.
-plot(as.Date(gron_eq_cat_old$date),gron_eq_cat_old$mag, main = "Magnitudes over time", xlab="Event time", ylab = "Magnitude")
+dev.new(height=5, width=9, noRStudioGD = TRUE)
+par(mfrow=c(1,1), bg='transparent')
+plot(as.Date(gron_eq_cat_old$date),gron_eq_cat_old$mag, xlab="Event time", ylab = "Magnitude", pch=19, col="grey", cex=0.7)
 plot(rev(gron_eq_cat_old$mag), main = "Magnitudes over index", xlab = "Index", ylab = "Magnitude")
 
 #Plotting event locations of both datasets
