@@ -36,7 +36,7 @@ Poisson_process_LL_icsmax <- function(par, data, covariates, threshold_obs, cova
   grid_box_E <- (max(unique(covariates$Easting))-min(unique(covariates$Easting)))/length(unique(covariates$Easting))
   grid_box_N <- (max(unique(covariates$Northing))-min(unique(covariates$Northing)))/length(unique(covariates$Northing))
   grid_box_area <- grid_box_E/1000* grid_box_N/1000
-  integrated_intensity <- sum(intensity_above_threshold)*grid_box_area
+  integrated_intensity <- sum(intensity_above_threshold, na.rm=T)*grid_box_area
   
   
   # Compute log-likelihood term 2

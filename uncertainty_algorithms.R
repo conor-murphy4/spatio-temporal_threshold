@@ -1,4 +1,5 @@
 source("src/eqd_geo.R")
+source("intensity_estimation.R")
 
 generate_non_par_bootstrap_samples <- function(data, n_samples) {
   n <- nrow(data)
@@ -74,4 +75,179 @@ saveRDS(bootstrap_results, file="threshold_results/uncertainty/threshold_values_
 # TODO - function for endpoint estimates
 # TODO - function for quantile estimates
 
+# Alg 1
+
+# Generate parametric bootstrap samples
+
+dist_matrix <- cbind(gron_eq_cat$V_1, gron_eq_cat$V_2, gron_eq_cat$V_3, gron_eq_cat$V_4, log(gron_eq_cat$V_1), 
+                        log(gron_eq_cat$V_2), log(gron_eq_cat$V_3), log(gron_eq_cat$V_4), 
+                        sqrt(gron_eq_cat$V_1), sqrt(gron_eq_cat$V_2), sqrt(gron_eq_cat$V_3), sqrt(gron_eq_cat$V_4))
+covariates_distances <- cbind(covariates$V1, covariates$V2, covariates$V3, covariates$V4, 
+                              log(covariates$V1), log(covariates$V2), log(covariates$V3), log(covariates$V4), 
+                              sqrt(covariates$V1), sqrt(covariates$V2), sqrt(covariates$V3), sqrt(covariates$V4))
+distance_obs <- dist_matrix[,chosen_model_index] 
+distance_covariate <- covariates_distances[,chosen_model_index]
+
+intensity_estimation <- function(data, covariates, thresh_fit, distance_obs, distance_covariate, grid_box_area=0.2445286) {
+  threshold_obs <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2] * distance_obs
+  covariates_threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2] * distance_covariate
   
+  PP_fit <- optim(Poisson_process_LL_icsmax, par = c(0.1, 0), data = data, covariates = covariates, 
+                  threshold_obs = threshold_obs, covariates_threshold = covariates_threshold, 
+                  thresh_fit = thresh_fit, control=list(fnscale=-1))
+  
+  estimated_intensity <- resulting_intensity_icsmax(PP_fit, covariates, covariates_threshold, thresh_fit)
+  aggregated_intensity <- sum(estimated_intensity, na.rm = TRUE)*grid_box_area
+  return(list(fit=PP_fit, est_intensity = estimated_intensity, agg_intensity = aggregated_intensity))
+}
+
+
+intensity_fit_obs <- intensity_estimation(gron_eq_cat, covariates, thresh_fit_A2, dist_matrix[,2], covariates_distances[,2])
+
+
+generate_parametric_bootstrap_estimates <- function(intensity_fit, thresh_fit, covariates, chosen_form, n_samples) {
+  
+  boot_estimates <- vector("list", length = n_samples)
+  
+  for (i in seq_len(n_samples)) {
+    n_obs <- rpois(1, intensity_fit$agg_intensity)
+    probs <- intensity_fit$est_intensity / intensity_fit$agg_intensity
+    sampled_indices <- sample(1:length(intensity_fit$est_intensity), size = n_obs, replace = TRUE, prob = probs)
+    sampled_covariates <- covariates[sampled_indices, ]
+    sampled_covariates_distances <- cbind(sampled_covariates$V_1, sampled_covariates$V_2, sampled_covariates$V_3, sampled_covariates$V_4, 
+                                          log(sampled_covariates$V_1), log(sampled_covariates$V_2), log(sampled_covariates$V_3), log(sampled_covariates$V_4), 
+                                          sqrt(sampled_covariates$V_1), sqrt(sampled_covariates$V_2), sqrt(sampled_covariates$V_3), sqrt(sampled_covariates$V_4))
+    
+    threshold_vals <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2] * sampled_covariates_distances[,chosen_form]
+    sigma_vals <- thresh_fit$par[1] + thresh_fit$par[2]*sampled_covariates$ICS_max + thresh_fit$par[3]*threshold_vals
+    boot_excesses <- numeric(n_obs)
+    for(j in seq_len(n_obs)) {
+      boot_excesses[j] <- rgpd(1, scale = sigma_vals[j], shape = thresh_fit$par[3])
+    }
+    ifelse(thresh_fit$par[3] < 0, pars_init <-  c(mean(boot_excesses), 0, 0.1) ,pars_init <- c(thresh_fit$par) )
+    gpd_fit <- optim(GPD_LL_given_V_ICS, par = pars_init, 
+                     excess = boot_excesses, thresh_par=thresh_fit$thresh_par, V=sampled_covariates_distances[, chosen_form], 
+                     ics= sampled_covariates$ICS_max, control=list(fnscale=-1))
+    sampled_covariates$Magnitude <- boot_excesses + threshold_vals
+    intensity_fit <- intensity_estimation(sampled_covariates, covariates, thresh_fit, 
+                                        distance_obs = sampled_covariates_distances[, chosen_form], 
+                                        distance_covariate = covariates_distances[, chosen_form])
+    boot_estimates[[i]] <- list(fit = gpd_fit$par, intensity_fit = intensity_fit$PP_fit$par)
+    
+  }
+  
+  return(boot_estimates)
+}
+
+
+generate_parametric_bootstrap_estimates <- function(intensity_fit, thresh_fit, covariates, chosen_form, n_samples, SEED=11111) {
+  
+  probs <- intensity_fit$est_intensity / intensity_fit$agg_intensity
+  n_cells <- length(probs)
+  
+  covariates_distances <- cbind(covariates$V1, covariates$V2, covariates$V3, covariates$V4,
+                                log(covariates$V1), log(covariates$V2), log(covariates$V3), log(covariates$V4), 
+                                sqrt(covariates$V1), sqrt(covariates$V2), sqrt(covariates$V3), sqrt(covariates$V4))
+    
+  
+  boot_samples <- vector("list", n_samples)
+  set.seed(SEED)
+  for (i in seq_len(n_samples)) {
+    # 1. Sample number of events
+    n_obs <- rpois(1, intensity_fit$agg_intensity)
+    sampled_indices <- sample.int(n_cells, n_obs, replace = TRUE, prob = probs)
+    sampled_covariates <- covariates[sampled_indices, , drop = FALSE]
+    
+    # 2. Calculate distances and threshold values
+    V_form <- covariates_distances[sampled_indices, chosen_form]
+    thresh_vals <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2] * V_form
+    sigma_vals <- thresh_fit$par[1] + thresh_fit$par[2]*sampled_covariates$ICS_max + thresh_fit$par[3]*thresh_vals
+    
+    # 3. Simulate GPD excesses
+    xi <- thresh_fit$par[3]
+    boot_excesses <- rgpd(n_obs, scale = sigma_vals, shape = xi)
+    
+    boot_samples[[i]] <- list(
+      sampled_covariates = sampled_covariates,
+      V_form = V_form,
+      thresh_vals = thresh_vals,
+      boot_excesses = boot_excesses
+    )
+  }
+  
+  return(boot_samples)
+}
+
+parametric_bootstrap_samples <- generate_parametric_bootstrap_estimates(intensity_fit = intensity_fit_obs, thresh_fit = thresh_fit_A2, 
+                                        covariates = covariates, chosen_form = 2, n_samples = 200)
+
+saveRDS(parametric_bootstrap_samples, file="threshold_results/uncertainty/parametric_samples_Alg1.rds")
+
+parametric_bootstrap_fits <- function(boot_samples, thresh_fit, covariates_distances, chosen_form) {
+  
+
+    sampled_covariates <- boot_samples$sampled_covariates
+    V_form <- boot_samples$V_form
+    thresh_vals <- boot_samples$thresh_vals
+    boot_excesses <- boot_samples$boot_excesses
+    
+    # Fit GPD model
+    xi <- thresh_fit$par[3]
+    init_mle <- mean(boot_excesses)
+    pars_init <- if (xi < 0) c(init_mle, 0, 0.1) else thresh_fit$par
+    gpd_fit <- optim(
+      GPD_LL_given_V_ICS, 
+      par = pars_init, 
+      excess = boot_excesses, 
+      thresh_par = thresh_fit$thresh_par, 
+      V = V_form, 
+      ics = sampled_covariates$ICS_max, 
+      control = list(fnscale = -1)
+    )
+    
+    # Add magnitudes and re-fit intensity model
+    sampled_covariates$Magnitude <- boot_excesses + thresh_vals
+    intensity_boot <- intensity_estimation(
+      sampled_covariates, covariates, thresh_fit,
+      distance_obs = V_form,
+      distance_covariate = covariates_distances[, chosen_form]
+    )
+    
+    boot_estimates <- list(
+      fit = gpd_fit$par, 
+      intensity_fit = intensity_boot$fit$par
+    )
+  
+  return(boot_estimates)
+}
+
+parametric_bootstrap_fits(boot_samples = parametric_bootstrap_samples[[1]], 
+                          thresh_fit = thresh_fit_A2, 
+                          covariates_distances = covariates_distances, 
+                          chosen_form = 2)
+
+# 4. Fit GPD model
+init_mle <- mean(boot_excesses)
+pars_init <- if (xi < 0) c(init_mle, 0, 0.1) else thresh_fit$par
+gpd_fit <- optim(
+  GPD_LL_given_V_ICS, 
+  par = pars_init, 
+  excess = boot_excesses, 
+  thresh_par = thresh_fit$thresh_par, 
+  V = V_form, 
+  ics = sampled_covariates$ICS_max, 
+  control = list(fnscale = -1)
+)
+
+# 5. Add magnitudes and re-fit intensity model
+sampled_covariates$Magnitude <- boot_excesses + thresh_vals
+intensity_boot <- intensity_estimation(
+  sampled_covariates, covariates, thresh_fit,
+  distance_obs = V_form,
+  distance_covariate = covariates_distances[, chosen_form]
+)
+
+boot_estimates[[i]] <- list(
+  fit = gpd_fit$par, 
+  intensity_fit = intensity_boot$PP_fit$par
+)
