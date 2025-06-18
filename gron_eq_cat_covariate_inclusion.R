@@ -11,51 +11,143 @@ gron_eq_cat_all_netherlands <- read.csv("Data/Events/unrounded_after_geophone_st
 gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
 gron_eq_cat_all <- read.csv("Data/Events/unrounded_after_geophone_start_in_polygon_with_V_3d.csv", header=T)
 gron_eq_cat_old <- read.csv("Data/Events/2022-04-12_15-09-25_cat.csv", header=T)
+covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
+covariates_1957_2055 <- read.csv("Data/covariates/covariates_1957-2055.csv", header=T)
+covariates_2055 <- read.csv("Data/covariates/covariates_1995-2055.csv", header=T)
+covariates_1957_2055_in_poly <- read.csv("Data/covariates/covariates_1957-2055_in_poly.csv", header=T)
 
-# Distance to 1st, 2nd, 3rd, and 4th nearest geophone
-# gron_eq_cat$V_1 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 1)
-# gron_eq_cat$V_2 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 2)
-# gron_eq_cat$V_3 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 3)
-# gron_eq_cat$V_4 <- distance_to_nearest(gron_eq_cat, geophones_deepest, 4)
+covariates_1957_2055_in_poly <- covariates_1957_2055[inpolygon(covariates_1957_2055$x, covariates_1957_2055$y, gron_polygon$POINT_X, gron_polygon$POINT_Y),]
 
-#ICS
-# ics <- read.csv("Data/covariates/data_ics.csv", header=T)
-# names(ics)[1] <- "Date"
-# names(ics)[4] <- "ICS"
-# ics$Date <- as.Date(ics$Date, format = "%Y-%m-%d")
-# ics$MonthYear <- stringr::str_sub(ics$Date, 1, 7)
-# ics <- ics[ics$Date >= "1995-04-01",]
-# ics_in_polygon <- inpolygon(ics$x, ics$y, gron_polygon$POINT_X, gron_polygon$POINT_Y)
-# ics <- ics[ics_in_polygon,]
-# write.csv(ics, "Data/covariates/ics_in_polygon.csv", row.names = F)
-ics <- read.csv("Data/covariates/ics_in_polygon.csv", header=T)
+covariates <- covariates_2055[covariates_2055$Date <= max(gron_eq_cat$Date) & covariates_2055$Date >= "1995-04-01",]
 
+# Creating ICS_max 
+covariates_2055$ICS_max <- rep(NA, nrow(covariates_2055))
+start_time <- Sys.time()
+for(date in unique(covariates_2055$Date)[2]){
+  print(date)
+  current_covariates <- covariates_2055[covariates_2055$Date == date,]
+  covariates_up_to_date <- covariates_2055[covariates_2055$Date <= date,]
+  # For each locatiion, find the maximum ICS value up to that date
+  # and assign it to the ICS_max column for that date
+  for(i in 1:nrow(current_covariates)){
+    print(paste(i, "of", nrow(current_covariates), "for date", date))
+    current_location <- current_covariates[i,]
+    ics_up_to_date_in_location <- covariates_up_to_date$ICS[covariates_up_to_date$Easting == current_location$Easting & covariates_up_to_date$Northing == current_location$Northing]
+    max_ics <- max(ics_up_to_date_in_location, na.rm = TRUE)
+    covariates_2055$ICS_max[covariates_2055$Date == date & covariates_2055$Easting == current_location$Easting & covariates_2055$Northing == current_location$Northing] <- max_ics
+  }
+}
+
+#How could I change the above loop to make it run faster?
+library(dplyr)
+
+
+covariates_2055 <- covariates_2055 %>%
+  arrange(Easting, Northing, Date) %>%
+  group_by(Easting, Northing) %>%
+  mutate(ICS_max = cummax(ICS)) %>%
+  ungroup()
+
+
+# Check if ICS_max is correctly calculated
+
+plot(as.Date(covariates_2055$Date), covariates_2055$ICS_max, xlab = "Date", ylab = "ICS max", col="grey", type='l')
+
+write.csv(covariates_2055, "Data/covariates/covariates_1995-2055.csv", row.names = F)
+
+length(covariates_2055$ICS_max[is.na(covariates_2055$ICS_max)])
+
+#Temporal derivative of ICS max
+# ICS max values - previous ICS max values
+
+#Calculating max values for first date in observation window
+# Filter to relevant time period first
+filtered_stress <- covariates_1957_2055_in_poly %>%
+  filter(time <= as.Date("1995-03-01"))
+
+# Compute max CoulombStress per location
+max_stress_by_location <- filtered_stress %>%
+  group_by(x, y) %>%
+  summarise(ICS_max = max(CoulombStress, na.rm = TRUE), .groups = "drop") %>%
+  rename(Easting = x, Northing = y)
+
+# Get covariates for the earliest date
+current_covariates <- covariates_2055 %>%
+  filter(Date == min(Date))
+
+# Create previous_covariates by joining with the precomputed max values
+previous_covariates <- current_covariates %>%
+  select(Easting, Northing) %>%
+  distinct() %>%
+  left_join(max_stress_by_location, by = c("Easting", "Northing")) %>%
+  mutate(Date = as.Date("1995-03-01"))
+
+
+# Calculating all values for dsmaxdt
+covariates_2055 <- covariates_2055 %>%
+  arrange(Easting, Northing, Date) %>%
+  group_by(Easting, Northing) %>%
+  mutate(dsmaxdt = ICS_max - lag(ICS_max)) %>%
+  ungroup()
+
+#Adding in values for first date for dsmaxdt
+covariates_2055$dsmaxdt[covariates_2055$Date == min(covariates_2055$Date)] <- current_covariates$ICS_max - previous_covariates$ICS_max
+
+
+#order covariates_2055 by date
+covariates_2055 <- covariates_2055[order(covariates_2055$Date),]
+#Remove columns from covariates_2055
+covariates_2055 <- covariates_2055[,c("Date", "MonthYear","Easting", "Northing", "Depth", "V1", "ICS", "dsdt", "ICS_max", "dsmaxdt")]
+
+# Taking out values within observation window
+covariates <- covariates_2055[covariates_2055$Date <= max(covariates$Date) & covariates_2055$Date >= min(covariates$Date),] 
+
+#Checking time development of ICS max and dsmaxdt for a location
+dev.new(height=10, width=10, noRStudioGD = TRUE)
+par(mfrow=c(1,1), bg = "transparent")
+loc <- c(255000, 570000)
+covariates_loc <- covariates[covariates$Easting == loc[1] & covariates$Northing == loc[2],]
+plot(as.Date(covariates_loc$Date), covariates_loc$dsmaxdt, xlab = "Date", ylab = "ICS max temporal derivative", col="grey", type='l')
+plot(as.Date(covariates_loc$Date), covariates_loc$ICS_max, xlab = "Date", ylab = "ICS max", col="grey", type='l')
+
+
+
+#Checking dates where less than 4 geophones are present
 for(date in unique(covariates$Date)){
   geos <- geo_current(geophones_deepest, date)
   if(nrow(geos) < 4){
     print(date)
   }
 }
-gron_eq_cat$MonthYear <- stringr::str_sub(gron_eq_cat$Date, 1, 7)
-gron_eq_cat$ICS <- rep(NA, nrow(gron_eq_cat))
+
+#Extracting ICS and dsdt for each event
+gron_eq_cat$ICS_max <- rep(NA, nrow(gron_eq_cat))
+gron_eq_cat$dsmaxdt <- rep(NA, nrow(gron_eq_cat))
+
 for(monthyear in unique(gron_eq_cat$MonthYear)){
   print(monthyear)
   eq_cat_ind <- which(gron_eq_cat$MonthYear == monthyear)
   current_eq_cat <- gron_eq_cat[eq_cat_ind,]
-  current_ics <- ics[ics$MonthYear == monthyear,]
+  current_covariates <- covariates[covariates$MonthYear == monthyear,]
   # Find nearest location in ICS data for each earthquake
-  extracted_ics <- rep(NA, nrow(current_eq_cat))
+  extracted_ics_max <- rep(NA, nrow(current_eq_cat))
+  extracted_dsmaxdt <- rep(NA, nrow(current_eq_cat))
   for(i in 1:nrow(current_eq_cat)){
-    extracted_ics[i] <- current_ics$ICS[which.min((current_eq_cat$Easting[i] - current_ics$x)^2 + (current_eq_cat$Northing[i] - current_ics$y)^2)]
+    extracted_ics_max[i] <- current_covariates$ICS_max[which.min(sqrt((current_eq_cat$Easting[i] - current_covariates$Easting)^2 + (current_eq_cat$Northing[i] - current_covariates$Northing)^2))]
+    extracted_dsmaxdt[i] <- current_covariates$dsmaxdt[which.min(sqrt((current_eq_cat$Easting[i] - current_covariates$Easting)^2 + (current_eq_cat$Northing[i] - current_covariates$Northing)^2))]
   }
-  gron_eq_cat$ICS[eq_cat_ind] <- extracted_ics
+  gron_eq_cat$ICS_max[eq_cat_ind] <- extracted_ics_max
+  gron_eq_cat$dsmaxdt[eq_cat_ind] <- extracted_dsmaxdt
 }
 
-#write.csv(gron_eq_cat, "Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", row.names = F)
+plot(as.Date(gron_eq_cat$Date), gron_eq_cat$dsmaxdt, xlab = "Date", ylab = "ICS temporal derivative", col="grey", type='l')
+abline(h=0, col="red", lty=2)
+names(gron_eq_cat)
 
+gron_eq_cat <- gron_eq_cat[,c("Datetime", "Date", "MonthYear", "Year", "Easting", "Northing", "Depth", "V_1", "V_2", "V_3", "V_4", "Magnitude", "ICS", "dsdt", "ICS_max", "dsmaxdt")]
+write.csv(gron_eq_cat, "Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", row.names = F)
 
 # Covariate dataset -------------------------------------------------------
-covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
 
 # covariates$V1 <- distance_to_nearest(covariates, geophones_deepest, 1)
 # covariates$V2 <- distance_to_nearest(covariates, geophones_deepest, 2)
@@ -69,8 +161,8 @@ covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
 
 # ------ Space-time fields of threshold, GPD parameters, summaries
 # Using V1 threshold fit as example, will need to be repeated for best choice
-thresh_fit_V1_ics <- readRDS("threshold_results/geo_thresh_fit_V1with_ics.rds")
-covariates$threshold <- thresh_fit_geo_ics$thresh_par[1] + thresh_fit_geo_ics$thresh_par[2] * covariates$V1
+thresh_fit_V2_ics <- readRDS("threshold_results/geo_thresh_fit_V2with_ics.rds")
+covariates$threshold <- thresh$thresh_par[1] + thresh_fit_geo_ics$thresh_par[2] * covariates$V1
 covariates$sigma <- thresh_fit_geo_ics$par[1] + thresh_fit_geo_ics$par[2] * covariates$ICS + thresh_fit_geo_ics$par[3] * covariates$threshold 
 covariates$xi <- rep(thresh_fit_geo_ics$par[3], nrow(covariates))
 
@@ -209,8 +301,8 @@ for(year in chosen_years){
     }
   }
   plot_df <- plot_df[complete.cases(plot_df),]
-  print(ggplot(plot_df, aes(x = Easting, y = Northing, fill = avg_threshold)) + geom_tile() + scale_fill_gradient(low = "blue", high = "red") + ggtitle(paste("Average threshold (V1) and exceedance locations in", year)) +
-          geom_point(data = current_exceedances, aes(x = Easting, y = Northing), size=2, shape=19, fill = "black"))
+  ggplot(plot_df, aes(x = Easting, y = Northing, fill = avg_threshold)) + geom_tile() + scale_fill_gradient(low = "blue", high = "red") + + fixed_plot_aspect(ratio = 1) + theme_classic() +
+          geom_point(data = current_exceedances, aes(x = Easting, y = Northing), size=2, shape=19, fill = "black")
 }
 
 #Average stress plots for different years

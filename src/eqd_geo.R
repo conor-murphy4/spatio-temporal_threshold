@@ -191,7 +191,7 @@ eqd_stepped <- function(data, thresh, change_index, k = 100, m = 500, underlying
 }
 
 
-eqd_geo_ics <- function(data, thresh, distance_to_geo, ics, k = 100, m = 500, max_dist = 33.782, min_ics = 0, underlying_thresh = 0){
+eqd_geo_ics_max_dist <- function(data, thresh, distance_to_geo, ics, k = 100, m = 500, max_dist = 33.782, min_ics = 0, underlying_thresh = 0){
   # TODO Update code to allow for differing underlying threshold
   # TODO Assess chosen values of max_dist and min_ics
   
@@ -258,7 +258,7 @@ eqd_geo_ics <- function(data, thresh, distance_to_geo, ics, k = 100, m = 500, ma
 }
 
 
-eqd_geo_ics_unconstrained <- function(data, thresh, distance_to_geo, ics, k = 100, m = 500, underlying_thresh = 0){
+eqd_geo_ics <- function(data, thresh, distance_to_geo, ics, k = 100, m = 500, underlying_thresh = 0){
   
   # Check inputs are valid
   if (!is.numeric(data)) stop("Data must be a vector")
@@ -275,7 +275,7 @@ eqd_geo_ics_unconstrained <- function(data, thresh, distance_to_geo, ics, k = 10
   # inf_list_boot <- list()
   ########################## extra code for Inf investigation ##################
   for (i in 1:nrow(thresh)) {
-    print(i)
+    #print(i)
     u <- thresh[i,1] + thresh[i,2] * distance_to_geo
     if(any(u < underlying_thresh)) stop(paste("Candidate thresholds must be above the underlying threshold of ", underlying_thresh))
     excess <- data[data > u] - u[data > u]
@@ -284,7 +284,7 @@ eqd_geo_ics_unconstrained <- function(data, thresh, distance_to_geo, ics, k = 10
     num_excess[i] <- length(excess)
     if (num_excess[i] > 20) {
       mle0 <- mean(excess)
-      init.fit <- optim(GPD_LL_given_V_ICS_unconstrained, excess = excess, par = c(mle0, 0, 0.1), control = list(fnscale = -1), 
+      init.fit <- optim(GPD_LL_given_V_ICS, excess = excess, par = c(mle0, 0, 0.1), control = list(fnscale = -1), 
                         thresh_par=thresh[i,], V = V_excess, ics=ICS_excess)
       xis[i] <- init.fit$par[3]
       sigma_par[i,] <- init.fit$par[1:2]
@@ -298,7 +298,7 @@ eqd_geo_ics_unconstrained <- function(data, thresh, distance_to_geo, ics, k = 10
         ICS_excess_boot <- ICS_excess[sampled_indices]
         init_mle <- mean(excess_boot)
         ifelse(xis[i] < 0, pars_init <-  c(init_mle, 0, 0.1) ,pars_init <- c(sigma_par[i,], xis[i]) )
-        gpd.fit <- optim(GPD_LL_given_V_ICS_unconstrained, excess = excess_boot, par = pars_init, control = list(fnscale = -1), 
+        gpd.fit <- optim(GPD_LL_given_V_ICS, excess = excess_boot, par = pars_init, control = list(fnscale = -1), 
                          thresh_par=thresh[i,], V = V_excess_boot, ics = ICS_excess_boot)
         sigma_given_V <- gpd.fit$par[1] + gpd.fit$par[2]*ICS_excess_boot + gpd.fit$par[3] * (thresh[i,1] + thresh[i,2]*V_excess_boot)
         if(any((1 + gpd.fit$par[3] * excess_boot/sigma_given_V) < 1e-323)) next
@@ -338,3 +338,5 @@ eqd_geo_ics_unconstrained <- function(data, thresh, distance_to_geo, ics, k = 10
   ########################## extra code for Inf investigation ##################
   return(result)
 }
+
+

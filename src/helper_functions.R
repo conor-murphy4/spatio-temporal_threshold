@@ -459,7 +459,7 @@ GPD_LL_step <- function(par, excess, thresh){
   #Current min and max distances are conservative and should be updated based on Stephen's guidance
   
   if(length(par)!=2) stop("par must be a vector of length 2")
-  if(length(thresh)!=length(excess)) stop("excess and thresh must be the same length")
+  #if(length(thresh)!=length(excess)) stop("excess and thresh must be the same length")
   if (!is.numeric(excess)) stop("excess must be a vector")
  
   sigma<-par[1]
@@ -487,18 +487,12 @@ GPD_LL_step <- function(par, excess, thresh){
   }
 }
 
-#Function to get par ests and confidence intervals
-get_par_ests_geo <- function(mags, thresh_fit, V, show_fit = TRUE){
-  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
-  excesses <- mags[mags > threshold] - threshold[mags > threshold]
-  V_excess <- V[mags > threshold]
+#Get par ests and delta confidence intervals
+
+get_par_ests <- function(mags, threshold, show_fit = TRUE){
+  excesses <- mags[mags > threshold] - threshold
   mle0 <- mean(excesses)
-  gpd_fit <- optim(GPD_LL_given_V, excess = excesses, par = c(mle0,0.1), control = list(fnscale = -1), thresh_par=thresh_fit$thresh_par, 
-                   V = V_excess, min_dist = min(V), max_dist = max(V), hessian = TRUE)
-  check <- gpd_fit$par[1] == thresh_fit$par[1] & gpd_fit$par[2] == thresh_fit$par[2]
-  if(!check){
-    stop("Parameter estimates don't agree")
-  }
+  gpd_fit <- optim(GPD_LL, z = excesses, par = c(mle0,0.1), control = list(fnscale = -1), hessian = TRUE)
   hessian <- gpd_fit$hessian
   cov_matrix <- solve(-1*hessian)
   se <- sqrt(diag(cov_matrix))
@@ -506,10 +500,10 @@ get_par_ests_geo <- function(mags, thresh_fit, V, show_fit = TRUE){
   lower <- gpd_fit$par - z*se
   upper <- gpd_fit$par + z*se
   if(show_fit){
-    output <- list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3), fit=gpd_fit)
+    output <- list(par=gpd_fit$par, SE = se, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3), fit=gpd_fit)
   }
   else{
-    output <- list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3))
+    output <- list(par=gpd_fit$par, SE = se, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3))
   }
   return(output)
 }
@@ -526,7 +520,7 @@ get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, min_ics = 0, max_dist
   check <- gpd_fit$par[1] == thresh_fit$par[1] & gpd_fit$par[2] == thresh_fit$par[2] & gpd_fit$par[3] == thresh_fit$par[3]
   if(!check){
     print(gpd_fit$par)
-    stop("Parameter estimates don't agree")
+    print("Parameter estimates don't agree")
   }
   hessian <- gpd_fit$hessian
   cov_matrix <- solve(-1*hessian)
@@ -535,52 +529,24 @@ get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, min_ics = 0, max_dist
   lower <- gpd_fit$par - z*se
   upper <- gpd_fit$par + z*se
   if(show_fit){
-    output <- list(par=gpd_fit$par, CI_beta0=round(c(lower[1], upper[1]), 3), CI_beta1=round(c(lower[2], upper[2]),3), 
+    output <- list(par=gpd_fit$par, SE = se, CI_beta0 = round(c(lower[1], upper[1]), 3), CI_beta1 = round(c(lower[2], upper[2]),3), 
                    CI_shape = round(c(lower[3], upper[3]),3), fit=gpd_fit)
   }
   else{
-    output <- list(par=gpd_fit$par,CI_beta0=round(c(lower[1], upper[1]), 3), CI_beta1=round(c(lower[2], upper[2]),3),
+    output <- list(par=gpd_fit$par, SE = se, CI_beta0 = round(c(lower[1], upper[1]), 3), CI_beta1 = round(c(lower[2], upper[2]),3),
                    CI_shape = round(c(lower[3], upper[3]),3))
   }
   return(output)
 }
 
-get_par_ests_step <- function(mags, threshold){
-  threshold_excess <- threshold[mags > threshold]
-  excesses <- mags[mags > threshold] - threshold_excess
-  mle0 <- mean(excesses)
-  gpd_fit <- optim(GPD_LL_step, excess = excesses, par = c(mle0,0.1), control = list(fnscale = -1), thresh=threshold_excess, hessian = TRUE)
-  hessian <- gpd_fit$hessian
-  cov_matrix <- solve(-1*hessian)
-  se <- sqrt(diag(cov_matrix))
-  z <- qnorm(0.975)
-  lower <- gpd_fit$par - z*se
-  upper <- gpd_fit$par + z*se
-  return(list(par=gpd_fit$par, CI_scale=round(c(lower[1], upper[1]), 3), CI_shape=round(c(lower[2], upper[2]),3)))
-}
 
-get_par_ests_const_ics <- function(mags, threshold,ics){
-  threshold_excess <- threshold[mags > threshold]
-  ics_excess <- ics[mags > threshold]
-  excesses <- mags[mags > threshold] - threshold_excess
-  mle0 <- mean(excesses)
-  gpd_fit <- optim(GPD_LL_ICS_constant_thresh, excess = excesses, par = c(mle0,0,0.1), control = list(fnscale = -1), thresh=threshold_excess, ics = ics_excess, hessian = TRUE)
-  hessian <- gpd_fit$hessian
-  cov_matrix <- solve(-1*hessian)
-  se <- sqrt(diag(cov_matrix))
-  z <- qnorm(0.975)
-  lower <- gpd_fit$par - z*se
-  upper <- gpd_fit$par + z*se
-  return(list(par=gpd_fit$par, CI_beta0=round(c(lower[1], upper[1]), 3), CI_beta1=round(c(lower[2], upper[2]),3), CI_shape=round(c(lower[3], upper[3]),3) ))
-}
-
-#Update below function to work for different types of threshold
-get_qq_plot_geo <- function(mags, thresh_fit, V, n_boot = 200, main = "Q-Q plot"){
-  threshold <- thresh_fit$thresh[1] + thresh_fit$thresh[2]*V
+get_qq_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6), SEED=11111){
+  set.seed(SEED)
+  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
-  V_excess <- V[mags > threshold]
-  sigma_tilde <- thresh_fit$par[1] + thresh_fit$par[2]*threshold[mags > threshold]
-  transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = thresh_fit$par[2])
+  ics_excess <- ics[mags > threshold]
+  sigma_tilde <- thresh_fit$par[1] + thresh_fit$par[2]*ics_excess + thresh_fit$par[3]*threshold[mags > threshold]
+  transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = thresh_fit$par[3])
   probs <- c(1:length(excesses))/(length(excesses)+1)
   sample_quantiles <- quantile(transformed_excess, probs = probs)
   model_quantiles <- qexp(probs, rate = 1)
@@ -592,20 +558,18 @@ get_qq_plot_geo <- function(mags, thresh_fit, V, n_boot = 200, main = "Q-Q plot"
   }
   upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
   lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
-  plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1, main = main)
+  plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1, main = main, xlim=xlim, ylim=ylim)
   abline(a = 0, b = 1, col="grey")
   lines(model_quantiles, upper, col = "red", lwd=2, lty="dashed")
   lines(model_quantiles, lower, col = "red", lwd=2, lty="dashed")
 }
 
-#Fix below function
 
-get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot"){
-  threshold_excess <- threshold[mags > threshold]
-  excesses <- mags[mags > threshold] - threshold_excess
-  par_ests <- get_par_ests_step(mags = mags, threshold = threshold)$par
-  sigma_tilde <- par_ests[1] + par_ests[2]*threshold_excess
-  transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = par_ests[2])
+get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6), SEED= 11111){
+  set.seed(SEED)
+  excesses <- mags[mags > threshold] - threshold
+  par_ests <- get_par_ests(mags = mags, threshold = threshold)$par
+  transformed_excess <- transform_to_exp(y = excesses, sig = par_ests[1], xi = par_ests[2])
   
   probs <- c(1:length(excesses))/(length(excesses)+1)
   sample_quantiles <- quantile(transformed_excess, probs = probs)
@@ -619,10 +583,62 @@ get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot"){
   
   upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
   lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
-  plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1, main = main)
+  plot(model_quantiles, sample_quantiles, xlab = "Theoretical quantiles", ylab = "Sample quantiles", pch=19, asp=1, main = main, xlim=xlim, ylim=ylim)
   abline(a = 0, b = 1, col="grey")
   lines(model_quantiles, upper, col = "red", lwd=2, lty="dashed")
   lines(model_quantiles, lower, col = "red", lwd=2, lty="dashed")
+}
+
+get_pp_plot_const <- function(mags, threshold, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1), SEED=11111){
+  excesses <- mags[mags > threshold] - threshold
+  par_ests <- get_par_ests(mags = mags, threshold = threshold)$par
+  transformed_excess <- transform_to_exp(y = excesses, sig = par_ests[1], xi = par_ests[2])
+  
+  transformed_excess_sorted <- sort(transformed_excess)
+  sample_probs <- c(1:length(transformed_excess)) / (length(transformed_excess) + 1)
+  model_probs <- pexp(transformed_excess_sorted, rate = 1)
+  
+  
+  bootstrapped_probs <- matrix(NA, nrow = n_boot, ncol = length(excesses))
+  set.seed(SEED)
+  for(i in 1:n_boot){
+    bootstrapped_probs[i,] <- sort(runif(length(excesses)))
+  }
+  
+  upper <- apply(bootstrapped_probs, 2, quantile, prob = 0.975)
+  lower <- apply(bootstrapped_probs, 2, quantile, prob = 0.025)
+  
+  plot(sample_probs, model_probs, xlab = "Sample probabilities", ylab = "Model probabilities", pch=19, asp=1, main = main, xlim=xlim, ylim=ylim)
+  abline(a = 0, b = 1, col="grey")
+  lines(sample_probs, upper, col = "red", lwd=2)
+  lines(sample_probs, lower, col = "red", lwd=2)
+}
+
+get_pp_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1), SEED=11111){
+  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
+  excesses <- mags[mags > threshold] - threshold[mags > threshold]
+  ics_excess <- ics[mags > threshold]
+  sigma_tilde <- thresh_fit$par[1] + thresh_fit$par[2]*ics_excess + thresh_fit$par[3]*threshold[mags > threshold]
+  transformed_excess <- transform_to_exp(y = excesses, sig = sigma_tilde, xi = thresh_fit$par[3])
+  
+  transformed_excess_sorted <- sort(transformed_excess)
+  sample_probs <- c(1:length(transformed_excess)) / (length(transformed_excess)+1)
+  model_probs <- pexp(transformed_excess_sorted, rate = 1)
+  
+  bootstrapped_probs <- matrix(NA, nrow = n_boot, ncol = length(excesses))
+  set.seed(SEED)
+  for(i in 1:n_boot){
+    bootstrapped_probs[i,] <- sort(runif(length(excesses)))
+  }
+  
+  upper <- apply(bootstrapped_probs, 2, quantile, prob = 0.975)
+  lower <- apply(bootstrapped_probs, 2, quantile, prob = 0.025)
+  
+  plot(sample_probs, model_probs, xlab = "Sample probabilities", ylab = "Model probabilities", pch=19, asp=1, main = main, xlim=xlim, ylim=ylim)
+  abline(a = 0, b = 1, col="grey")
+  lines(sample_probs, upper, col = "red", lwd=2)
+  lines(sample_probs, lower, col = "red", lwd=2)
+  
 }
 
 get_eqd_value <- function(mags, threshold, par, SEED = 11111, num_boot = 200, m = 500, step = FALSE){
@@ -655,7 +671,7 @@ get_eqd_value <- function(mags, threshold, par, SEED = 11111, num_boot = 200, m 
 }
 
 
-GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics, max_dist = 33.782, min_ics = 0){
+GPD_LL_given_V_ICS_max_dist <- function(par, excess, thresh_par, V, ics, max_dist = 33.782, min_ics = 0){
   # Max distance taken above as length of gas field while min_ics is taken as 0, may need updating
   
   if(length(par)!=3) stop("par must be a vector of length 3")
@@ -698,7 +714,7 @@ GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics, max_dist = 33.78
   }
 }
 
-GPD_LL_given_V_ICS_unconstrained <- function(par, excess, thresh_par, V, ics){
+GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
   
   if(length(par)!=3) stop("par must be a vector of length 3")
   if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
@@ -804,4 +820,30 @@ GPD_LL_ICS_constant_thresh_const_shape <- function(par, excess, ics, thresh, sha
   else{
     return(-1e7)
   }
+}
+
+
+get_table_of_results <- function(mags, threshold){
+  thresh_par <- unique(threshold)
+  par_ests <- get_par_ests_step(mags, threshold)
+  num_excess <- sum(mags > threshold)
+  eqd_val <- get_eqd_value(mags, threshold, par = par_ests$par)
+  return(list(thresh_par, num_excess, eqd_val, par_ests))
+  
+}
+
+# Instructions:
+# - Change the list_of_fits to the desired threshold
+# - Change the dist_matrix to the desired distance matrix
+# - The entries in the returned list correspond to V1-V4 
+get_table_of_results_geo_ics <- function(mags, list_of_fits, dist_matrix, ics, min_ics, max_dists){
+  table_results <- vector("list", 4)
+  for(i in 1:4){
+    chosen_thresh <- list_of_fits[[i]]$thresh_par
+    par_ests <- get_par_ests_geo_ics(mags, list_of_fits[[i]], dist_matrix[,i], ics, min_ics, max_dist = max_dists[i])
+    num_excess <- list_of_fits[[i]]$num_excess
+    eqd_val <- min(list_of_fits[[i]]$dists, na.rm = TRUE)
+    table_results[[i]] <- list(chosen_thresh, num_excess, eqd_val, par_ests) 
+  }
+  return(table_results)
 }

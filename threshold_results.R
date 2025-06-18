@@ -1,10 +1,62 @@
 library(ggplot2)
+library(dplyr)
 source("src/helper_functions.R")
 
 
-gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon.csv", header=T)
+gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
 mags <- gron_eq_cat$Magnitude
-third_nearest_dist_matrix <- matrix(c(gron_eq_cat$V_1, gron_eq_cat$V_2, gron_eq_cat$V_3, gron_eq_cat$V_4), byrow=F, ncol=4)
+nearest_dist_matrix <- matrix(c(gron_eq_cat$V_1, gron_eq_cat$V_2, gron_eq_cat$V_3, gron_eq_cat$V_4), byrow=F, ncol=4)
+covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
+
+# Most recent threshold results
+
+#ICS max (B=200) - Results shown in paper
+thresh_fit_V1_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_V1.rds")
+thresh_fit_V2_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_V2.rds")
+thresh_fit_V3_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_V3.rds")
+thresh_fit_V4_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_V4.rds")
+
+thresh_fit_logV1_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_logV1.rds")
+thresh_fit_logV2_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_logV2.rds")
+thresh_fit_logV3_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_logV3.rds")
+thresh_fit_logV4_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_logV4.rds")
+
+thresh_fit_sqrtV1_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_sqrtV1.rds")
+thresh_fit_sqrtV2_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_sqrtV2.rds")
+thresh_fit_sqrtV3_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_sqrtV3.rds")
+thresh_fit_sqrtV4_ics <- readRDS("threshold_results/icsmax/geo_thresh_fit_sqrtV4.rds")
+
+# B=1000
+# thresh_fit_V1_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_V1.rds")
+# thresh_fit_V2_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_V2.rds")
+# thresh_fit_V3_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_V3.rds")
+# thresh_fit_V4_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_V4.rds")
+# 
+# thresh_fit_logV1_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_logV1.rds")
+# thresh_fit_logV2_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_logV2.rds")
+# thresh_fit_logV3_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_logV3.rds")
+# thresh_fit_logV4_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_logV4.rds")
+# 
+# thresh_fit_sqrtV1_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_sqrtV1.rds")
+# thresh_fit_sqrtV2_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_sqrtV2.rds")
+# thresh_fit_sqrtV3_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_sqrtV3.rds")
+# thresh_fit_sqrtV4_ics <- readRDS("threshold_results/icsmax/boot1000/geo_thresh_fit_sqrtV4.rds")
+
+# Minimum dists values
+min(thresh_fit_V1_ics$dists, na.rm = TRUE)
+min(thresh_fit_V2_ics$dists, na.rm = TRUE)
+min(thresh_fit_V3_ics$dists, na.rm = TRUE)
+min(thresh_fit_V4_ics$dists, na.rm = TRUE)
+
+min(thresh_fit_logV1_ics$dists, na.rm = TRUE)
+min(thresh_fit_logV2_ics$dists, na.rm = TRUE)
+min(thresh_fit_logV3_ics$dists, na.rm = TRUE)
+min(thresh_fit_logV4_ics$dists, na.rm = TRUE)
+
+min(thresh_fit_sqrtV1_ics$dists, na.rm = TRUE)
+min(thresh_fit_sqrtV2_ics$dists, na.rm = TRUE)
+min(thresh_fit_sqrtV3_ics$dists, na.rm = TRUE)
+min(thresh_fit_sqrtV4_ics$dists, na.rm = TRUE)
 
 #Fitted thresholds
 eqd_thresh_fit <- readRDS("threshold_results/eqd_thresh_fit.rds")
@@ -23,22 +75,12 @@ geo_thresh_fit <- vector("list", 4)
 log_geo_thresh_fit <- vector("list", 4)
 sqrt_geo_thresh_fit <- vector("list", 4)
 for(i in 1:4){
-  geo_thresh_fit[[i]] <- readRDS(paste0("threshold_results/geo_thresh_fit_V", i, ".rds"))
-  log_geo_thresh_fit[[i]] <- readRDS(paste0("threshold_results/log_geo_thresh_fit_V", i, ".rds"))
-  sqrt_geo_thresh_fit[[i]] <- readRDS(paste0("threshold_results/sqrt_geo_thresh_fit_V", i, ".rds"))
+  geo_thresh_fit[[i]] <- readRDS(paste0("threshold_results/icsmax/geo_thresh_fit_V", i, ".rds"))
+  log_geo_thresh_fit[[i]] <- readRDS(paste0("threshold_results/icsmax/geo_thresh_fit_logV", i, ".rds"))
+  sqrt_geo_thresh_fit[[i]] <- readRDS(paste0("threshold_results/icsmax/geo_thresh_fit_sqrtV", i, ".rds"))
 }
-
 
 # Results for the constant and stepped thresholds
-
-get_table_of_results <- function(mags, threshold){
-  thresh_par <- unique(threshold)
-  par_ests <- get_par_ests_step(mags, threshold)
-  num_excess <- sum(mags > threshold)
-  eqd_val <- get_eqd_value(mags, threshold, par = par_ests$par)
-  return(list(thresh_par, par_ests$CI_scale, par_ests$CI_shape, num_excess, eqd_val))
-
-}
 
 get_table_of_results(mags, conservative_threshold)
 get_table_of_results(mags, eqd_threshold)
@@ -46,26 +88,22 @@ get_table_of_results(mags, piecewise_const_thresh)
 get_table_of_results(mags, pc_fitted_threshold)
 
 #Results for the geophone-based thresholds
-# Instructions:
-# - Change the list_of_fits to the desired threshold
-# - Change the dist_matrix to the desired distance matrix
-# - The entries in the returned list correspond to V1-V4 
-get_table_of_results_geo <- function(mags, list_of_fits, dist_matrix){
-  table_results <- vector("list", 4)
-  for(i in 1:4){
-    chosen_thresh <- list_of_fits[[i]]$thresh_par
-    par_ests <- get_par_ests_geo(mags, list_of_fits[[i]], dist_matrix[,i])
-    num_excess <- list_of_fits[[i]]$num_excess
-    eqd_val <- min(list_of_fits[[i]]$dists, na.rm = TRUE)
-    table_results[[i]] <- list(chosen_thresh, par_ests$CI_scale, par_ests$CI_shape, num_excess, eqd_val) 
-  }
-  return(table_results)
-}
 
-get_table_of_results_geo(mags, geo_thresh_fit, third_nearest_dist_matrix)
-get_table_of_results_geo(mags, log_geo_thresh_fit, log(third_nearest_dist_matrix))
-get_table_of_results_geo(mags, sqrt_geo_thresh_fit, sqrt(third_nearest_dist_matrix))
-                                                         
+min_ics <- min(covariates$ICS_max, na.rm = TRUE)
+current_covariates <- covariates %>% filter(Year == max(covariates$Year))
+max_dists <- c(max(current_covariates$V1), max(current_covariates$V2), 
+               max(current_covariates$V3), max(current_covariates$V4, na.rm=T))
+
+get_table_of_results_geo_ics(mags, geo_thresh_fit, nearest_dist_matrix, gron_eq_cat$ICS_max, 
+                            min_ics, max_dists)
+get_table_of_results_geo_ics(mags, log_geo_thresh_fit, log(nearest_dist_matrix), gron_eq_cat$ICS_max, 
+                            min_ics, log(max_dists))
+get_table_of_results_geo_ics(mags, sqrt_geo_thresh_fit, sqrt(nearest_dist_matrix), gron_eq_cat$ICS_max,
+                            min_ics, sqrt(max_dists))
+
+
+
+                               
 #QQplots
 dev.new(height=40, width=40, noRStudioGD = TRUE)
 par(mfrow=c(4,4), bg='transparent')
