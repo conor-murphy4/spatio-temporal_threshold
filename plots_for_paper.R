@@ -213,18 +213,48 @@ sum(gron_eq_cat$Magnitude > gron_eq_cat$threshold_A2)
 sum(gron_eq_cat$Magnitude > gron_eq_cat$threshold_B1)
 sum(gron_eq_cat$Magnitude > gron_eq_cat$threshold_C2)
 
+# average A2 threshold over space
+covariates$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * covariates$V2
+covariates_in_gasfield <- covariates[inpolygon(covariates$Easting, covariates$Northing, gron_outline$Easting, gron_outline$Northing),]
+covariates_at_obs_loc <- covariates[(covariates$Easting %in% gron_eq_cat$Easting & covariates$Northing %in% gron_eq_cat$Northing),]
+
+
+average_A2_threshold_over_polygon <- covariates %>%
+  group_by(Date) %>%
+  summarise(threshold = mean(threshold_A2, na.rm = TRUE), .groups = "drop")
+
+average_A2_threshold_over_field <- covariates_in_gasfield %>%
+  group_by(Date) %>%
+  summarise(threshold = mean(threshold_A2, na.rm = TRUE), .groups = "drop")
+
+average_A2_threshold_over_obs <- covariates_at_obs_loc %>%
+  group_by(Date) %>%
+  summarise(threshold = mean(threshold_A2, na.rm = TRUE), .groups = "drop")
+
+locations <- data.frame(Easting = c(250000, 250000, 250000), Northing = c(575000, 590000, 605000))
+threshold_loc1 <- covariates$threshold_A2[covariates$Easting == locations$Easting[1] & covariates$Northing == locations$Northing[1]]
+threshold_loc2 <- covariates$threshold_A2[covariates$Easting == locations$Easting[2] & covariates$Northing == locations$Northing[2]]
+threshold_loc3 <- covariates$threshold_A2[covariates$Easting == locations$Easting[3] & covariates$Northing == locations$Northing[3]]
+
+
 dev.new(height=5, width=5, noRStudioGD = TRUE)
 par(mfrow=c(1,1), bg='transparent')
 plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab="Event time", ylab = "Magnitude", pch=19, col="grey", cex=0.7)
 lines(as.Date(gron_eq_cat$Date), gron_eq_cat$threshold_A2, lwd=2)
 lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-#gron_eq_cat$zak_sigmoid <- sigmoid_threshold(x=c(1:nrow(gron_eq_cat)), mu = 746, zeta = 1)
 lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
+lines(as.Date(average_A2_threshold_over_polygon$Date), average_A2_threshold_over_polygon$threshold, lwd=2, lty=4, col="orange")
+lines(as.Date(average_A2_threshold_over_field$Date[-1]), average_A2_threshold_over_field$threshold[-1], lwd=2, col="green")
+lines(as.Date(average_A2_threshold_over_obs$Date), average_A2_threshold_over_obs$threshold, lwd=2,col="orange")
+lines(as.Date(unique(covariates$Date)[-1]), threshold_loc1[-1], col="purple", lwd=2)
+lines(as.Date(unique(covariates$Date)[-1]), threshold_loc2[-1], col="darkgreen", lwd=2)
+lines(as.Date(unique(covariates$Date)[-1]), threshold_loc3[-1], col="orange", lwd=2,)
+
 
 diff_thr_B1 <- gron_eq_cat$threshold_A2 - gron_eq_cat$threshold_B1
 diff_thr_C2 <- gron_eq_cat$threshold_A2 - gron_eq_cat$threshold_C2
 
-plot(as.Date(gron_eq_cat$Date), diff_thr_B1, xlab="Event time", ylab = "Difference in threshold", col="green", type='l', 
+plot(as.Date(gron_eq_cat$Date), diff_thr_B1, xlab="Event time", ylab = "Difference in threshold", col="yellow", type='l', 
      ylim=c(min(diff_thr_B1, diff_thr_C2), max(diff_thr_B1, diff_thr_C2)))
 lines(as.Date(gron_eq_cat$Date), diff_thr_C2, col="red")
 abline(h=0, col="black", lty=2)
@@ -467,3 +497,60 @@ ggplot(agg_intensity_df, aes(x = Year)) +
   scale_color_discrete(guide="none")
 
 
+# Future inference --------------------------------------------------------
+(endpoint_max <- max(future_covariates$endpoint, na.rm = TRUE))
+
+endpoint_by_year <- future_covariates %>% group_by(Year) %>%
+  summarise(endpoint_wm = sum(endpoint*normalised_intensity, na.rm = TRUE), agg_intensity_per_year = sum(intensity_above_0, na.rm = TRUE)) 
+
+endpoint_by_year <- endpoint_by_year[-nrow(endpoint_by_year),]
+
+sum(endpoint_by_year$endpoint_wm * endpoint_by_year$agg_intensity_per_year/agg_intensity)
+
+dev.new(height=5, width=10, noRStudioGD = TRUE)
+par(mfrow=c(1,2), bg='transparent')
+plot(endpoint_by_year$Year, endpoint_by_year$agg_intensity_per_year/agg_intensity, type = "l", 
+     xlab = "Year", ylab = "Ratio of integrated intensities", lwd=2, ylim=c(0,0.08))
+plot(endpoint_by_year$Year, endpoint_by_year$endpoint_wm, type = "l", 
+     xlab = "Year", ylab = "Weighted mean endpoint", lwd=2)
+
+
+future_covariates_2025 <- future_covariates %>% filter(Date == "2025-01-01") 
+future_covariates_2040 <- future_covariates %>% filter(Date == "2040-01-01")
+future_covariates_2055 <- future_covariates %>% filter(Date == "2055-01-01")
+
+change_2025_2040 <- future_covariates_2040 %>%
+  left_join(future_covariates_2025, by = c("Easting", "Northing"), suffix = c("_2040", "_2025")) %>%
+  mutate(change_normalised_intensity = normalised_intensity_2040 - normalised_intensity_2025,
+         change_endpoint = endpoint_2040 - endpoint_2025)
+change_2040_2055 <- future_covariates_2055 %>%
+  left_join(future_covariates_2040, by = c("Easting", "Northing"), suffix = c("_2055", "_2040")) %>%
+  mutate(change_normalised_intensity = normalised_intensity_2055 - normalised_intensity_2040,
+         change_endpoint = endpoint_2055 - endpoint_2040)
+
+fill_limits <- range(c(change_2025_2040$change_endpoint,
+                       change_2040_2055$change_endpoint), na.rm = TRUE)
+plot1 <- ggplot(future_covariates_2025, aes(x = Easting, y = Northing, fill = endpoint)) +
+  geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
+  theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red") +
+  labs(x = "Easting (m)", y = "Northing (m)", fill = "Endpoint") + coord_fixed()
+plot2 <- ggplot(change_2025_2040, aes(x = Easting, y = Northing, fill = change_endpoint)) +
+  geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
+  theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
+  labs(x = "Easting (m)", y = "Northing (m)", fill = "Change in Endpoint") + coord_fixed()
+plot3 <- ggplot(change_2040_2055, aes(x = Easting, y = Northing, fill = change_endpoint)) +
+  geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
+  theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
+  labs(x = "Easting (m)", y = "Northing (m)", fill = "Change in Endpoint") + coord_fixed()
+
+# Combine the plots using patchwork
+plots <- list(plot2, plot3)
+# Confirm that both are valid ggplot objects
+dev.new(height=5, width=10, noRStudioGD = TRUE)
+par(mfrow=c(1,1), bg='transparent')
+if (all(sapply(plots, inherits, "ggplot"))) {
+  combined_plot <- wrap_plots(plots, guides = "collect") & theme(legend.position = "right")
+  print(combined_plot)
+} else {
+  stop("One or more plots are not ggplot objects.")
+}

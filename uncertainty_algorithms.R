@@ -251,3 +251,76 @@ boot_estimates[[i]] <- list(
   fit = gpd_fit$par, 
   intensity_fit = intensity_boot$PP_fit$par
 )
+
+
+# Standard errors from bootstrap estimates for Alg 1
+bootstrap_estimates_Alg1 <- readRDS("uncertainty/bootstrap_fits_Alg1_C2.rds")
+
+standard_errors_Alg1 <- function(boot_estimates) {
+  n_boot <- length(boot_estimates)
+  par_matrix <- do.call(rbind, lapply(boot_estimates, function(x) x$fit))
+  intensity_matrix <- do.call(rbind, lapply(boot_estimates, function(x) x$intensity_fit))
+  
+  se_params <- apply(par_matrix, 2, sd)
+  se_intensity <- apply(intensity_matrix, 2, sd)
+  
+  return(list(se_params = se_params, se_intensity = se_intensity))
+}
+
+(se_results_Alg1 <- standard_errors_Alg1(bootstrap_estimates_Alg1))
+
+CIs_Alg1 <- function(boot_estimates, alpha = 0.05) {
+  n_boot <- length(boot_estimates)
+  par_matrix <- do.call(rbind, lapply(boot_estimates, function(x) x$fit))
+  intensity_matrix <- do.call(rbind, lapply(boot_estimates, function(x) x$intensity_fit))
+  
+  lower_bound_params <- apply(par_matrix, 2, quantile, probs = alpha / 2)
+  upper_bound_params <- apply(par_matrix, 2, quantile, probs = 1 - alpha / 2)
+  
+  lower_bound_intensity <- apply(intensity_matrix, 2, quantile, probs = alpha / 2)
+  upper_bound_intensity <- apply(intensity_matrix, 2, quantile, probs = 1 - alpha / 2)
+  
+  return(list(
+    params_CI = data.frame(lower = lower_bound_params, upper = upper_bound_params),
+    intensity_CI = data.frame(lower = lower_bound_intensity, upper = upper_bound_intensity)
+  ))
+}
+(CIs_results_Alg1 <- CIs_Alg1(bootstrap_estimates_Alg1))
+
+
+
+# Conservative threshold with Alg 1
+
+conservative_threshold <- 1.45
+excesses_above_threshold <- gron_eq_cat$Magnitude[gron_eq_cat$Magnitude > conservative_threshold] - conservative_threshold
+mean_excess <- mean(excesses_above_threshold, na.rm = TRUE)
+
+gpd_fit_observed_sample <- optim(
+  GPD_LL, 
+  par = c(mean_excess, 0.1), 
+  z = excesses_above_threshold, 
+  control = list(fnscale = -1)
+)
+
+intensity_fit_observed_sample <- optim(
+  Poisson_process_LL_const_thresh, 
+  par = c(0.1, 0), 
+  data = gron_eq_cat, 
+  covariates = covariates,
+  control = list(fnscale = -1)
+)
+
+grid_box_area <- 0.2445286
+num_samples <- 200
+set.seed(11111)
+for(ii in 1:num_samples){
+  estimated_intensity <- resulting_intensity_const_thresh(intensity_fit_observed_sample, covariates)
+  aggregated_intensity <- sum(estimated_intensity, na.rm = TRUE) * grid_box_area
+  num_obs <- rpois(1, aggregated_intensity)
+  ###### ????????
+}
+
+resulting_intensity_const_thresh <- function(opt_PP, covariates){
+  intensity_thresh <- covariates$dsmaxdt*exp(opt_PP$par[1] + opt_PP$par[2] * covariates$ICS)
+  return(intensity_thresh)
+}

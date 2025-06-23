@@ -14,27 +14,24 @@ library(patchwork)
 
 gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
 geophones_deepest <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_deepest_only.csv", header=T, row.names = 1)
-covariates_2055 <- read.csv("Data/covariates/covariates_1995-2055.csv", header=T)
 covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
 future_covariates <- read.csv("Data/covariates/future_covariates_2024-2055.csv", header=T)
 gron_outline <- read.csv('Data/Geophones/Groningen_Field_outline.csv', header=T)
+thresh_fit_A2 <- readRDS("threshold_results/icsmax/geo_thresh_fit_V2.rds")
 
 # Future period of 30 years from 01-01-2025 to 01-01-2055
 # future_covariates <- future_covariates %>%
-#  filter(Date >= "2025-01-01" ) 
-# 
+#   filter(Date >= "2025-01-01" & Date < "2055-01-01")
 # future_covariates$Year <- stringr::str_sub(future_covariates$Date, 1, 4) %>% as.numeric()
 
 # future_covariates$V2 <- distance_to_nearest(future_covariates, geophones_deepest,2)
 # future_covariates$V3 <- distance_to_nearest(future_covariates, geophones_deepest,3)
 # Best threshold fit
-thresh_fit_A2 <- readRDS("threshold_results/icsmax/geo_thresh_fit_V2.rds")
-gron_eq_cat$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * gron_eq_cat$V_2
 
 
 # Poisson process fit on observed data
-(opt_PP_LL_icsmax <- optim(Poisson_process_LL_icsmax, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates, 
-                           threshold_obs = gron_eq_cat$threshold_A2, covariates_threshold = covariates$best_threshold , 
+(opt_PP_LL_icsmax <- optim(Poisson_process_LL_icsmax, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates,
+                           threshold_obs = gron_eq_cat$threshold_A2, covariates_threshold = covariates$best_threshold ,
                            thresh_fit = thresh_fit_A2, control=list(fnscale=-1), hessian=T))
 
 
@@ -45,8 +42,8 @@ gron_eq_cat$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_p
 
 # These values will mostly be zero or close to zero due to the stresses not increasing
 
-grid_box_E <- (max(unique(covariates$Easting))-min(unique(covariates$Easting)))/length(unique(covariates$Easting))
-grid_box_N <- (max(unique(covariates$Northing))-min(unique(covariates$Northing)))/length(unique(covariates$Northing))
+grid_box_E <- (max(unique(future_covariates$Easting))-min(unique(future_covariates$Easting)))/length(unique(future_covariates$Easting))
+grid_box_N <- (max(unique(future_covariates$Northing))-min(unique(future_covariates$Northing)))/length(unique(future_covariates$Northing))
 grid_box_area <- grid_box_E/1000* grid_box_N/1000
 
 agg_intensity <- sum(future_covariates$intensity_above_0, na.rm = TRUE)
@@ -55,18 +52,12 @@ future_covariates <- future_covariates %>% group_by(Year) %>%
   mutate(agg_intensity_per_year = sum(intensity_above_0, na.rm = TRUE))%>%
   ungroup()
 
-future_covariates$normalised_intensity <- future_covariates$intensity_above_0 / future_covariates$agg_intensity_per_year    
-future_covariates$endpoint <- 1
-future_covariates$endpoint <- -(thresh_fit_A2$par[1] + thresh_fit_A2$par[2] * future_covariates$ICS_max)/thresh_fit_A2$par[3]
-
-(endpoint_max <- max(future_covariates$endpoint, na.rm = TRUE))
+# future_covariates$normalised_intensity <- future_covariates$intensity_above_0 / future_covariates$agg_intensity_per_year    
+# 
+# future_covariates$endpoint <- -(thresh_fit_A2$par[1] + thresh_fit_A2$par[2] * future_covariates$ICS_max)/thresh_fit_A2$par[3]
 
 endpoint_by_year <- future_covariates %>% group_by(Year) %>%
   summarise(endpoint_wm = sum(endpoint*normalised_intensity, na.rm = TRUE), agg_intensity_per_year = sum(intensity_above_0, na.rm = TRUE)) 
-
-endpoint_by_year <- endpoint_by_year[-nrow(endpoint_by_year),]
-
-sum(endpoint_by_year$endpoint_wm * endpoint_by_year$agg_intensity_per_year/agg_intensity)
 
 dev.new(height=5, width=10, noRStudioGD = TRUE)
 par(mfrow=c(1,2), bg='transparent')
@@ -75,127 +66,36 @@ plot(endpoint_by_year$Year, endpoint_by_year$agg_intensity_per_year/agg_intensit
 plot(endpoint_by_year$Year, endpoint_by_year$endpoint_wm, type = "l", 
      xlab = "Year", ylab = "Weighted mean endpoint", lwd=2)
 
-
-chosen_dates <- c("2025-01-01", "2040-01-01", "2055-01-01")
-future_covariates_selected <- future_covariates %>% filter(Date %in% chosen_dates)
-# Plot of normalised intensity for 2025, 2040 and 2055
-
-
-endpoint_wm_by_year <- future_covariates %>% group_by(Year) %>%
-  summarise(endpoint_wm_year = mean(endpoint_wm, na.rm = TRUE)) 
-
-intensity_by_year <- future_covariates %>% group_by(Year) %>%
-  summarise(agg_intensity_year = mean(intensity_above_0, na.rm = TRUE))
-plot(endpoint_wm_by_year$Year,endpoint_wm_by_year$endpoint_wm_year , type = "l", 
-     xlab = "Date", ylab = "Weighted mean endpoint", lwd=2)
-plot(stress_by_year$Year, stress_by_year$stress_year, type = "l", 
-     xlab = "Date", ylab = "Mean stress (ICS_max)", lwd=2)
-plot(agg_intensity_by_year$Year, agg_intensity_by_year$agg_intensity_year, type = "l",
-     xlab = "Date", ylab = "Mean aggregated intensity", lwd=2)
-
-# Plot of normalised intensity for 2025, 2040 and 2055
-library(ggplot2)
-library(dplyr)
-future_covariates_2025 <- future_covariates %>% filter(Date == "2025-01-01") 
-future_covariates_2040 <- future_covariates %>% filter(Date == "2040-01-01")
-future_covariates_2055 <- future_covariates %>% filter(Date == "2055-01-01")
-
-change_2025_2040 <- future_covariates_2040 %>%
-    left_join(future_covariates_2025, by = c("Easting", "Northing"), suffix = c("_2040", "_2025")) %>%
-    mutate(change_normalised_intensity = normalised_intensity_2040 - normalised_intensity_2025,
-           change_endpoint = endpoint_2040 - endpoint_2025)
-change_2040_2055 <- future_covariates_2055 %>%
-    left_join(future_covariates_2040, by = c("Easting", "Northing"), suffix = c("_2055", "_2040")) %>%
-    mutate(change_normalised_intensity = normalised_intensity_2055 - normalised_intensity_2040,
-           change_endpoint = endpoint_2055 - endpoint_2040)
-
-fill_limits <- range(c(future_covariates_2025$normalised_intensity,
-                       future_covariates_2040$normalised_intensity,
-                       future_covariates_2055$normalised_intensity), na.rm = TRUE)
-
-# plot1 <- ggplot(future_covariates_2025, aes(x = Easting, y = Northing, fill = normalised_intensity)) +
-#     geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-#     theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-#     labs(x = "Easting (m)", y = "Northing (m)", fill = expression(lambda[0]/Lambda[0])) + coord_fixed()
-# plot2 <- ggplot(future_covariates_2040, aes(x = Easting, y = Northing, fill = normalised_intensity)) +
-#     geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-#     theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-#     labs(x = "Easting (m)", y = "Northing (m)", fill = expression(lambda[0]/Lambda[0])) + coord_fixed()
-# plot3 <- ggplot(future_covariates_2055, aes(x = Easting, y = Northing, fill = normalised_intensity)) +
-#     geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-#     theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-#     labs(x = "Easting (m)", y = "Northing (m)", fill = expression(lambda[0]/Lambda[0])) + coord_fixed()
-
-# fill_limits <- range(c(future_covariates_2025$endpoint,
-#                        future_covariates_2040$endpoint,
-#                        future_covariates_2055$endpoint), na.rm = TRUE)
-# plot1 <- ggplot(future_covariates_2025, aes(x = Easting, y = Northing, fill = endpoint)) +
-#     geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-#     theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-#     labs(x = "Easting (m)", y = "Northing (m)", fill = "endpoint") + coord_fixed()
-# plot2 <- ggplot(future_covariates_2040, aes(x = Easting, y = Northing, fill = endpoint)) +
-#     geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-#     theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-#     labs(x = "Easting (m)", y = "Northing (m)", fill = "endpoint") + coord_fixed()
-# plot3 <- ggplot(future_covariates_2055, aes(x = Easting, y = Northing, fill = endpoint)) +
-#     geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-#     theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-#     labs(x = "Easting (m)", y = "Northing (m)", fill = "endpoint") + coord_fixed()
-
-fill_limits <- range(c(change_2025_2040$change_endpoint,
-                       change_2040_2055$change_endpoint), na.rm = TRUE)
-plot1 <- ggplot(future_covariates_2025, aes(x = Easting, y = Northing, fill = endpoint)) +
-  geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-  theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red") +
-  labs(x = "Easting (m)", y = "Northing (m)", fill = "Endpoint") + coord_fixed()
-plot2 <- ggplot(change_2025_2040, aes(x = Easting, y = Northing, fill = change_endpoint)) +
-  geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-  theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-  labs(x = "Easting (m)", y = "Northing (m)", fill = "Change in Endpoint") + coord_fixed()
-plot3 <- ggplot(change_2040_2055, aes(x = Easting, y = Northing, fill = change_endpoint)) +
-  geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-  theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-  labs(x = "Easting (m)", y = "Northing (m)", fill = "Change in Endpoint") + coord_fixed()
-
-# Combine the plots using patchwork
-plots <- list(plot2, plot3)
-# Confirm that both are valid ggplot objects
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-if (all(sapply(plots, inherits, "ggplot"))) {
-  combined_plot <- wrap_plots(plots, guides = "collect") & theme(legend.position = "right")
-  print(combined_plot)
-} else {
-  stop("One or more plots are not ggplot objects.")
+  # Functions to evaluate endpoints
+evaluate_endpoints <- function(future_covariates, intensity_par, gpd_par, grid_box_area = 0.2445286) {
+  
+  endpoints <- -(gpd_par[1] + gpd_par[2] * future_covariates$ICS_max)/gpd_par[3]
+  
+  endpoint_max <- max(endpoints, na.rm = TRUE)
+  
+  # weighted mean
+  intensity_above0 <- future_covariates$dsmaxdt * exp(intensity_par[1] + intensity_par[2] * future_covariates$ICS_max) 
+  
+  agg_intensity <- sum(intensity_above0, na.rm = TRUE) 
+  
+  # Calculate the weighted mean endpoint
+  endpoint_wm <- sum(endpoints * intensity_above0/agg_intensity , na.rm = TRUE)
+  
+  return(c(endpoint_max, endpoint_wm))
 }
 
-unique(future_covariates_2025$endpoint_wm2)
-unique(future_covariates_2040$endpoint_wm2)
-unique(future_covariates_2055$endpoint_wm2)
-# aggregated intensity for region
-aggregated_intensity_v <- function(v, future_covariates, thresh_fit, region = NULL, grid_box_area = 0.2445286) {
-  intensity_above_v <-  future_covariates$intensity_above_0 * (1 + thresh_fit$par[3] * (v) / future_covariates$sigma_0)^(-1 / thresh_fit$par[3])
-  # Do we need below?
-  intensity_above_v[1 + thresh_fit$par[3] * (v) / future_covariates$sigma_0 < 0] <- 0
-  # Filter by region
-  if (!is.null(region)) {
-    intensity_above_v <- intensity_above_v[inpolygon(future_covariates$Easting, future_covariates$Northing, 
-                                                      region$Easting, region$Northing),]
-  }
-  # Calculate aggregated intensity
-  agg_intensity_v <- sum(intensity_above_v, na.rm = TRUE) * grid_box_area
-  return(agg_intensity_v)
-}
 
-#aggregated_intensity_v(0, future_covariates, thresh_fit_A2)
+# Functions for evaluated v level  ----------------------------------------
 
 # v-level extreme event estimation
-v_level_extreme_event <- function(v, prob, future_covariates, thresh_fit, grid_box_area = 0.2445286) {
-  # Calculate aggregated intensity
-  intensity_above_v <-  future_covariates$intensity_above_0 * (1 + thresh_fit$par[3] * (v) / future_covariates$sigma_0)^(-1 / thresh_fit$par[3])
+v_level_extreme_event <- function(v, prob, future_covariates, intensity_par, gpd_par, grid_box_area = 0.2445286) {
+  
+  intensity_above0 <- future_covariates$dsmaxdt * exp(intensity_par[1] + intensity_par[2] * future_covariates$ICS_max)
+  sigma0 <- gpd_par[1] + gpd_par[2] * future_covariates$ICS_max
+  intensity_above_v <-  intensity_above0 * (1 + gpd_par[3] * (v) /sigma0 )^(-1 / gpd_par[3])
   # Do we need below?
-  intensity_above_v[1 + thresh_fit$par[3] * (v) / future_covariates$sigma_0 < 0] <- 0
-  #Calculate aggregated intensity
+  intensity_above_v[1 + gpd_par[3] * (v) / sigma0 < 0] <- 0
+  # Calculate aggregated intensity
   agg_intensity_v <- sum(intensity_above_v, na.rm = TRUE) * grid_box_area
   
   function_to_solve <- (agg_intensity_v + log(prob))^2
@@ -204,20 +104,70 @@ v_level_extreme_event <- function(v, prob, future_covariates, thresh_fit, grid_b
 }
 
 # v_level solver function
-v_level_solver <- function(prob, future_covariates, thresh_fit, region = NULL, grid_box_area = 0.2445286) {
-  # Define the function to solver
-  if(!is.null(region)) {
-    future_covariates_in_region <- future_covariates[inpolygon(future_covariates$Easting, future_covariates$Northing, 
-                                                      region$Easting, region$Northing),] 
-  } else {
-    future_covariates_in_region <- future_covariates
-  }
-  # Use uniroot to find the root
-  v_solution <- optimize(v_level_extreme_event, interval = c(0, 10), prob = 0.9387, 
-                         future_covariates = future_covariates_in_region, thresh_fit = thresh_fit_A2)
+v_level_solver <- function(prob, future_covariates,  intensity_par, gpd_par, upper_limit = 10, grid_box_area = 0.2445286) {
+  endpoints <- -(gpd_par[1] + gpd_par[2] * future_covariates$ICS_max)/gpd_par[3]
+  
+  endpoint_max <- max(endpoints, na.rm = TRUE)
+  v_solution <- optimize(v_level_extreme_event, interval = c(0, endpoint_max), prob = 0.9387, 
+                         future_covariates = future_covariates, intensity_par = intensity_par, gpd_par=gpd_par)
   return(v_solution)
 }
 
 v_level_solver(prob = 0.9387, future_covariates = future_covariates, 
-                thresh_fit = thresh_fit_A2, region = gron_outline)
+               intensity_par=opt_PP_LL_icsmax$par, 
+               gpd_par=thresh_fit_A2$par)
   
+
+
+# Future inference with uncertainty ---------------------------------------
+
+
+# Alg 1
+
+bootstrap_estimates_Alg1 <- readRDS("uncertainty/bootstrap_fits_Alg1.rds")
+
+v_levels_Alg1 <- unlist(lapply(bootstrap_estimates_Alg1, function(x) {v_level_solver(prob = 0.9387, 
+                                                                  future_covariates = future_covariates, 
+                                                                  intensity_par = x$intensity_fit, 
+                                                                  gpd_par = x$fit)$minimum}))
+total_sum <- 0
+
+for(jj in 1:200){
+  sum_current <- sum(bootstrap_estimates_Alg1[[jj]]$fit[3] >  0)
+  if(bootstrap_estimates_Alg1[[jj]]$fit[3] >  0){
+    print(bootstrap_estimates_Alg1[[jj]])
+    stop()
+  }
+total_sum  <- total_sum + sum_current
+}
+
+
+(CI_v_levels <- quantile(v_levels_Alg1, c(0.025, 0.975)))
+
+
+endpoints_Alg1 <- matrix(unlist(lapply(bootstrap_estimates_Alg1, function(x) {
+  evaluate_endpoints(future_covariates, x$intensity_fit, x$fit)})), ncol = 2, byrow = TRUE)
+
+(CI_endpoints_Alg1 <- apply(endpoints_Alg1, 2, quantile, c(0.025, 0.975)))
+
+# Alg 2 and 3 done in parallel on storm
+
+future_inferences_Alg2 <- readRDS("uncertainty/future_inferences_Alg2.rds")
+
+apply(future_inferences_Alg2, 2, quantile, c(0.025, 0.975), na.rm = TRUE) 
+
+sum(is.na(future_inferences_Alg2[,2]))/40000
+
+shape_vec <- numeric(40000)
+for (ii in 1:200) {
+  boot_ests <- bootstrap_fits_Alg1and2[[ii]]
+  # Extract the shape parameter from the fit
+  # Assuming the shape parameter is the third element in the fit vector
+  shape_vec[(ii - 1) * 200 + 1:200] <- do.call(rbind, lapply(boot_ests, function(x) x$fit[3]))
+}
+
+quantile(shape_vec, c(0.025, 0.975))
+
+hist(future_inferences_Alg2[,2], breaks=500)
+
+range(shape_vec[which(future_inferences_Alg2[,2] > 10)])
