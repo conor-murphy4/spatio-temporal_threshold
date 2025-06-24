@@ -6,6 +6,7 @@ geophones_deepest <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_dee
 gron_outline <- read.csv('Data/Geophones/Groningen_Field_outline.csv', header=T)
 gron_polygon <- read.table('Data/Geophones/polygon_for_groningen_earthquakes.txt', header=T)
 gron_rect <- data.frame(X=c(210000,275000, 275000, 210000, 210000), Y=c(560000, 560000, 625000, 625000, 560000))
+covariates_in_G <- read.csv("Data/covariates/covariates_in_gasfield_1995-2024.csv", header=T)
 
 library(ggplot2)
 library(ggspatial)
@@ -554,3 +555,62 @@ if (all(sapply(plots, inherits, "ggplot"))) {
 } else {
   stop("One or more plots are not ggplot objects.")
 }
+
+
+
+# Threshold uncertainty ---------------------------------------------------
+
+threshold_values_uncertainty_results_Alg2 <- readRDS("uncertainty/threshold_values_uncertainty_results_Alg2.rds")
+bootstrap_model_selection_results_Alg3 <- readRDS("uncertainty/bootstrap_model_selection_results_Alg3.rds")
+thresh_fit_A2 <- readRDS("threshold_results/icsmax/geo_thresh_fit_V2.rds")
+
+# Algorithm 2 -----------------------
+thresh_par_Alg2 <- do.call(rbind,lapply(threshold_values_uncertainty_results_Alg2, function(x){
+  x$thresh_par
+}))
+
+threshold_A2_over_G <- covariates_in_G %>% group_by(Date) %>%
+  summarise(mean_thresh = mean(thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V2, na.rm = TRUE), .groups = "drop")
+
+dev.new(height=5, width=5, noRStudioGD = TRUE)
+par(mfrow=c(1,1), bg='transparent')
+plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab = "Time", ylab = "Average threshold across gasfield", 
+     ylim=c(min(gron_eq_cat$Magnitude),4.5),pch=19, col="grey", cex=0.7)
+
+for(i in 1:nrow(thresh_par_Alg2)) {
+  average_boot_thresh <- covariates_in_G %>%
+    group_by(Date) %>%
+    summarise(mean_thresh = mean(thresh_par_Alg2[i, 1] + thresh_par_Alg2[i, 2] * V2, na.rm = TRUE), .groups = "drop")
+  lines(as.Date(average_boot_thresh$Date[-1]), average_boot_thresh$mean_thresh[-1], col=rgb(0,0,1,0.1))
+}
+lines(as.Date(threshold_A2_over_G$Date[-1]), threshold_A2_over_G$mean_thresh[-1], col="green", lwd=3)
+
+# Algorithm 3 -----------------------
+thresh_par_Alg3 <- do.call(rbind,lapply(bootstrap_model_selection_results_Alg3, function(x){
+  x$model_results$thresh_par
+}))
+
+chosen_models <- do.call(rbind, lapply(bootstrap_model_selection_results_Alg3, function(x){
+  x$chosen_form
+}))
+
+threshold_A2_over_G <- covariates_in_G %>% group_by(Date) %>%
+  summarise(mean_thresh = mean(thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V2, na.rm = TRUE), .groups = "drop")
+
+covariates_distances_in_G <- cbind(covariates_in_G$V1, covariates_in_G$V2, covariates_in_G$V3, covariates_in_G$V4,
+                                   log(covariates_in_G$V1), log(covariates_in_G$V2), log(covariates_in_G$V3), log(covariates_in_G$V4),
+                                   sqrt(covariates_in_G$V1), sqrt(covariates_in_G$V2), sqrt(covariates_in_G$V3), sqrt(covariates_in_G$V4))
+
+dev.new(height=5, width=5, noRStudioGD = TRUE)
+par(mfrow=c(1,1), bg='transparent')
+plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab = "Time", ylab = "Average threshold across gasfield", 
+     ylim=c(min(gron_eq_cat$Magnitude),4.5),pch=19, col="grey", cex=0.7)
+
+for(i in 1:nrow(thresh_par_Alg2)) {
+  covariates_in_G$current_dist <- covariates_distances_in_G[,chosen_models[i]]
+  average_boot_thresh <- covariates_in_G %>%
+    group_by(Date) %>%
+    summarise(mean_thresh = mean(thresh_par_Alg3[i, 1] + thresh_par_Alg3[i, 2] * current_dist, na.rm = TRUE), .groups = "drop")
+  lines(as.Date(average_boot_thresh$Date[-1]), average_boot_thresh$mean_thresh[-1], col=rgb(0,0,1,0.1))
+}
+lines(as.Date(threshold_A2_over_G$Date[-1]), threshold_A2_over_G$mean_thresh[-1], col="green", lwd=3)

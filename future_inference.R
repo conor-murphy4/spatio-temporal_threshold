@@ -141,7 +141,9 @@ for(jj in 1:200){
 total_sum  <- total_sum + sum_current
 }
 
+quantile(sapply(bootstrap_estimates_Alg1, function(x){x$fit[3]}), c(0.025, 0.975))
 
+sd(sapply(bootstrap_estimates_Alg1, function(x){x$fit[3]}))
 (CI_v_levels <- quantile(v_levels_Alg1, c(0.025, 0.975)))
 
 
@@ -160,14 +162,64 @@ sum(is.na(future_inferences_Alg2[,2]))/40000
 
 shape_vec <- numeric(40000)
 for (ii in 1:200) {
-  boot_ests <- bootstrap_fits_Alg1and2[[ii]]
+  boot_ests <- bootstrap_fits_Alg1and3[[ii]]
   # Extract the shape parameter from the fit
   # Assuming the shape parameter is the third element in the fit vector
-  shape_vec[(ii - 1) * 200 + 1:200] <- do.call(rbind, lapply(boot_ests, function(x) x$fit[3]))
+  shape_vec[(ii - 1) * 200 + 1:(200*ii)] <- do.call(rbind, lapply(boot_ests, function(x) x$fit[3]))
 }
 
-quantile(shape_vec, c(0.025, 0.975))
 
-hist(future_inferences_Alg2[,2], breaks=500)
+quantile(shape_vec, c(0.025, 0.975), na.rm = TRUE)
+hist(shape_vec)
+num_excess <- numeric(200)
+for (ii in 1:200) {
+  boot_ests <- bootstrap_model_selection_results_Alg3[[ii]]
+  # Extract the shape parameter from the fit
+  # Assuming the shape parameter is the third element in the fit vector
+  num_excess[ii] <- boot_ests$model_results$num_excess
+}
+
+min(num_excess)
+max(num_excess)
+mean(num_excess)
+sd(num_excess)
+
+threshold_values_uncertainty_results_Alg2[[1]]
+quantile(endpoint_sorted, c(0.25, 0.75))
+
+hist(future_inferences_Alg2[future_inferences_Alg2[,2] < 13,1])
+
+endpoint_sorted <- sort(future_inferences_Alg2[,3], decreasing = TRUE)
+
+hist(endpoint_sorted[(0.025*40000):40000])
 
 range(shape_vec[which(future_inferences_Alg2[,2] > 10)])
+
+shape_vec <- numeric(200)
+for (ii in 1:200) {
+  boot_ests <- bootstrap_fits_Alg1_conservative[[ii]]
+  # Extract the shape parameter from the fit
+  # Assuming the shape parameter is the third element in the fit vector
+  shape_vec[ii] <- boot_ests$fit[3]
+}
+sd(shape_vec)
+hist(shape_vec, breaks = 50, main = "Shape parameter distribution", xlab = "Shape parameter")
+
+
+quantile(future_inferences_Alg3[,2], c(0.25, 0.75), na.rm = TRUE)
+
+# Proporition of model forms chosen
+chosen_models <- do.call(rbind, lapply(bootstrap_model_selection_results_Alg3, function(x) x$chosen_form))
+
+sum(chosen_models %in% c(1,2,3,4))/ length(chosen_models)
+sum(chosen_models %in% c(5,6,7,8))/ length(chosen_models)
+sum(chosen_models %in% c(9,10,11,12))/ length(chosen_models)
+
+sum(chosen_models %in% c(1,5,9))/ length(chosen_models)
+sum(chosen_models %in% c(2,6,10))/ length(chosen_models)
+sum(chosen_models %in% c(3,7,11))/ length(chosen_models)
+sum(chosen_models %in% c(4,8,12))/ length(chosen_models)
+
+sum(chosen_models == 2)/ length(chosen_models)
+sum(chosen_models == 5)/ length(chosen_models)
+sum(chosen_models == 10)/ length(chosen_models)
