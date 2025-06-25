@@ -710,7 +710,7 @@
 #   # Calculate aggregated intensity
 #   agg_intensity_v <- sum(intensity_above_v, na.rm = TRUE) * grid_box_area
 #   
-#   function_to_solve <- (agg_intensity_v + log(prob))^2
+#   function_to_solve <- (exp(-agg_intensity_v) -prob)^2
 #   
 #   return(function_to_solve)
 # }
@@ -719,7 +719,7 @@
 # v_level_solver <- function(prob, future_covariates,  intensity_par, gpd_par, upper_limit = 10, grid_box_area = 0.2445286) {
 #   
 #   if(gpd_par[3] >= 0) {
-#     v_solution <- NA
+#     upper_limit <- 13
 #   }
 #   else{
 #     # Calculate the endpoints
