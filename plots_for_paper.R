@@ -266,14 +266,43 @@ abline(h=0, col="black", lty=2)
 #QQplot
 dev.new(height=5, width=5, noRStudioGD = TRUE)
 par(mfrow=c(1,1), bg='transparent')
-get_qq_plot_const(gron_eq_cat$Magnitude, 1.45, main="" )
+
+threshold <- 1.45
+
+excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
+
+fit_obs <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
+                 thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
+                 control = list(fnscale = -1))
+
+(opt_PP_LL_icsmax <- optim(Poisson_process_LL_icsmax, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates,
+                           threshold_obs = gron_eq_cat$threshold_A2, covariates_threshold = covariates$best_threshold ,
+                           thresh_fit = thresh_fit_A2, control=list(fnscale=-1), hessian=T))
+
+
+thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
+intensity_fit <- optim(Poisson_process_LL_icsmax, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates, threshold_obs=rep(1.45, nrow(gron_eq_cat)),
+                       covariates_threshold = rep(1.45, nrow(covariates)), thresh_fit = thresh_fit,
+                       control = list(fnscale = -1))
+
+(v_point_estimate <- v_level_solver(prob = 0.9387, future_covariates = future_covariates, 
+                              intensity_par=intensity_fit$par, 
+                              gpd_par=fit_obs$par))
+
+# endpoint at location of largest EQ
+gron_largest_eq <- gron_eq_cat[gron_eq_cat$Magnitude > 3.5,]
+(endpoint <- -(fit_obs$par[1] + fit_obs$par[2] * gron_largest_eq$ICS_max) / fit_obs$par[3])
+
+
+thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
 get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
 
 #PPplots
 dev.new(height=5, width=5, noRStudioGD = TRUE)
 par(mfrow=c(1,1), bg='transparent')
 
-get_pp_plot_const(gron_eq_cat$Magnitude, 1.45, main="", n_boot=1000 )
+get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="", n_boot=1000 )
 get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="", n_boot=1000 )
 
 # Spatial threshold plots --------------------------------------------------
@@ -577,14 +606,19 @@ par(mfrow=c(1,1), bg='transparent')
 plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab = "Time", ylab = "Average threshold across gasfield", 
      ylim=c(min(gron_eq_cat$Magnitude),4.5),pch=19, col="grey", cex=0.7)
 
+mean_mat <- matrix(0, nrow = nrow(thresh_par_Alg2), ncol = length(unique(covariates_in_G$Date)))
 for(i in 1:nrow(thresh_par_Alg2)) {
   average_boot_thresh <- covariates_in_G %>%
     group_by(Date) %>%
     summarise(mean_thresh = mean(thresh_par_Alg2[i, 1] + thresh_par_Alg2[i, 2] * V2, na.rm = TRUE), .groups = "drop")
-  lines(as.Date(average_boot_thresh$Date[-1]), average_boot_thresh$mean_thresh[-1], col=rgb(0,0,1,0.1))
+  mean_mat[i, ] <- average_boot_thresh$mean_thresh
+  lines(as.Date(average_boot_thresh$Date[-1]), average_boot_thresh$mean_thresh[-1], col=rgb(0,0,0.8,0.1))
 }
 lines(as.Date(threshold_A2_over_G$Date[-1]), threshold_A2_over_G$mean_thresh[-1], col="green", lwd=3)
-
+upper_bound <- apply(mean_mat, 2, quantile, probs = 0.975)
+lower_bound <- apply(mean_mat, 2, quantile, probs = 0.025)
+lines(as.Date(average_boot_thresh$Date[-1]), upper_bound[-1], col="darkorange", lwd=2)
+lines(as.Date(average_boot_thresh$Date[-1]), lower_bound[-1], col="darkorange", lwd=2)
 # Algorithm 3 -----------------------
 thresh_par_Alg3 <- do.call(rbind,lapply(bootstrap_model_selection_results_Alg3, function(x){
   x$model_results$thresh_par
@@ -606,11 +640,17 @@ par(mfrow=c(1,1), bg='transparent')
 plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab = "Time", ylab = "Average threshold across gasfield", 
      ylim=c(min(gron_eq_cat$Magnitude),4.5),pch=19, col="grey", cex=0.7)
 
-for(i in 1:nrow(thresh_par_Alg2)) {
+mean_mat <- matrix(0, nrow = nrow(thresh_par_Alg3), ncol = length(unique(covariates_in_G$Date)))
+for(i in 1:nrow(thresh_par_Alg3)) {
   covariates_in_G$current_dist <- covariates_distances_in_G[,chosen_models[i]]
   average_boot_thresh <- covariates_in_G %>%
     group_by(Date) %>%
     summarise(mean_thresh = mean(thresh_par_Alg3[i, 1] + thresh_par_Alg3[i, 2] * current_dist, na.rm = TRUE), .groups = "drop")
-  lines(as.Date(average_boot_thresh$Date[-1]), average_boot_thresh$mean_thresh[-1], col=rgb(0,0,1,0.1))
+  mean_mat[i, ] <- average_boot_thresh$mean_thresh
+  lines(as.Date(average_boot_thresh$Date[-1]), average_boot_thresh$mean_thresh[-1], col=rgb(0,0,0.8,0.1))
 }
 lines(as.Date(threshold_A2_over_G$Date[-1]), threshold_A2_over_G$mean_thresh[-1], col="green", lwd=3)
+upper_bound <- apply(mean_mat, 2, quantile, probs = 0.975)
+lower_bound <- apply(mean_mat, 2, quantile, probs = 0.025)
+lines(as.Date(average_boot_thresh$Date[-1]), upper_bound[-1], col="darkorange", lwd=2)
+lines(as.Date(average_boot_thresh$Date[-1]), lower_bound[-1], col="darkorange", lwd=2)

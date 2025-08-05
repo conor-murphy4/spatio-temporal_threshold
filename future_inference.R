@@ -93,23 +93,37 @@ v_level_extreme_event <- function(v, prob, future_covariates, intensity_par, gpd
   intensity_above0 <- future_covariates$dsmaxdt * exp(intensity_par[1] + intensity_par[2] * future_covariates$ICS_max)
   sigma0 <- gpd_par[1] + gpd_par[2] * future_covariates$ICS_max
   intensity_above_v <-  intensity_above0 * (1 + gpd_par[3] * (v) /sigma0 )^(-1 / gpd_par[3])
-  # Do we need below?
+  
   intensity_above_v[1 + gpd_par[3] * (v) / sigma0 < 0] <- 0
+  intensity_above_v[sigma0 <= 0] <- 0
   # Calculate aggregated intensity
   agg_intensity_v <- sum(intensity_above_v, na.rm = TRUE) * grid_box_area
   
-  function_to_solve <- (agg_intensity_v + log(prob))^2
+  function_to_solve <- (exp(-agg_intensity_v) - prob)^2
   
   return(function_to_solve)
 }
 
 # v_level solver function
-v_level_solver <- function(prob, future_covariates,  intensity_par, gpd_par, upper_limit = 10, grid_box_area = 0.2445286) {
-  endpoints <- -(gpd_par[1] + gpd_par[2] * future_covariates$ICS_max)/gpd_par[3]
+v_level_solver <- function(prob, future_covariates,  intensity_par, gpd_par, grid_box_area = 0.2445286) {
   
-  endpoint_max <- max(endpoints, na.rm = TRUE)
-  v_solution <- optimize(v_level_extreme_event, interval = c(0, endpoint_max), prob = 0.9387, 
-                         future_covariates = future_covariates, intensity_par = intensity_par, gpd_par=gpd_par)
+  if(gpd_par[3] >= 0) {
+    upper_limit <- 13
+  }
+  else{
+    # Calculate the endpoints
+    endpoints <- -(gpd_par[1] + gpd_par[2] * future_covariates$ICS_max)/gpd_par[3]
+    
+    endpoint_max <- max(endpoints, na.rm = TRUE)
+    if(endpoint_max > 13){
+      upper_limit <- 13
+    }
+    else{
+      upper_limit <- endpoint_max
+    }
+  }
+  v_solution <- optimize(v_level_extreme_event, interval = c(0, upper_limit), prob = 0.9387,
+                         future_covariates = future_covariates, intensity_par = intensity_par, gpd_par=gpd_par)$minimum
   return(v_solution)
 }
 
@@ -155,8 +169,16 @@ endpoints_Alg1 <- matrix(unlist(lapply(bootstrap_estimates_Alg1, function(x) {
 # Alg 2 and 3 done in parallel on storm
 
 future_inferences_Alg2 <- readRDS("uncertainty/future_inferences_Alg2.rds")
+future_inferences_Alg3 <- readRDS("uncertainty/future_inferences_Alg3.rds")
 
-apply(future_inferences_Alg2, 2, quantile, c(0.025, 0.975), na.rm = TRUE) 
+future_inferences_Alg2[is.na(future_inferences_Alg2[,2]),2] <- Inf
+future_inferences_Alg3[is.na(future_inferences_Alg3[,2]),2] <- Inf
+
+future_inferences_Alg2[is.na(future_inferences_Alg2[,3]),3] <- Inf
+future_inferences_Alg3[is.na(future_inferences_Alg3[,3]),3] <- Inf
+
+apply(future_inferences_Alg2, 2, quantile, c(0.025, 0.975)) 
+apply(future_inferences_Alg3, 2, quantile, c(0.025, 0.975))
 
 sum(is.na(future_inferences_Alg2[,2]))/40000
 
@@ -187,7 +209,7 @@ sd(num_excess)
 threshold_values_uncertainty_results_Alg2[[1]]
 quantile(endpoint_sorted, c(0.25, 0.75))
 
-hist(future_inferences_Alg2[future_inferences_Alg2[,2] < 13,1])
+hist(future_inferences_Alg2[,3])
 
 endpoint_sorted <- sort(future_inferences_Alg2[,3], decreasing = TRUE)
 
@@ -197,14 +219,14 @@ range(shape_vec[which(future_inferences_Alg2[,2] > 10)])
 
 shape_vec <- numeric(200)
 for (ii in 1:200) {
-  boot_ests <- bootstrap_fits_Alg1_conservative[[ii]]
+  boot_ests <- bootstrap_fits_Alg1[[ii]]
   # Extract the shape parameter from the fit
   # Assuming the shape parameter is the third element in the fit vector
   shape_vec[ii] <- boot_ests$fit[3]
 }
 sd(shape_vec)
 hist(shape_vec, breaks = 50, main = "Shape parameter distribution", xlab = "Shape parameter")
-
+sum(shape_vec > 0)/200
 
 quantile(future_inferences_Alg3[,2], c(0.25, 0.75), na.rm = TRUE)
 
@@ -223,3 +245,38 @@ sum(chosen_models %in% c(4,8,12))/ length(chosen_models)
 sum(chosen_models == 2)/ length(chosen_models)
 sum(chosen_models == 5)/ length(chosen_models)
 sum(chosen_models == 10)/ length(chosen_models)
+
+# Conservative future inference
+future_inferences_Alg1_conservative <- readRDS("uncertainty/future_inferences_Alg1_conservative.rds")
+bootstrap_estimates_Alg1_conservative <- readRDS("uncertainty/bootstrap_fits_Alg1_conservative.rds")
+
+future_inferences_Alg1_conservative[is.na(future_inferences_Alg1_conservative[,2]),2] <- Inf
+future_inferences_Alg1_conservative[is.na(future_inferences_Alg1_conservative[,3]),3] <- Inf
+
+apply(future_inferences_Alg1_conservative, 2, quantile, c(0.025, 0.975))
+
+gpd_par_mat <- matrix(unlist(lapply(bootstrap_estimates_Alg1_conservative, function(x) x$fit)), ncol = 3, byrow = TRUE)
+intensity_par_mat <- matrix(unlist(lapply(bootstrap_estimates_Alg1_conservative, function(x) x$intensity_fit)), ncol = 2, byrow = TRUE)
+
+weird_indexes <- which(future_inferences_Alg1_conservative[,2] > 20)
+future_inferences_Alg1_conservative[which(future_inferences_Alg1_conservative[,2] > 20),2 ]
+
+hist(future_inferences_Alg1_conservative[which(future_inferences_Alg1_conservative[,1] < 20),1])
+
+weird_indexes
+gpd_par_mat[weird_indexes[8], ]
+intensity_par_mat[weird_indexes[8], ]
+future_inferences_Alg1_conservative[weird_indexes[8], ]
+
+x <- seq(0, 20, length.out = 50)
+test_v_levels <- numeric(length(x))
+for (ii in 1:length(x)) {
+  test_v_levels[ii] <- v_level_extreme_event(x[ii], prob = 0.9387, 
+                                              future_covariates = future_covariates, 
+                                              intensity_par = intensity_par_mat[weird_indexes[8], ], 
+                                              gpd_par = gpd_par_mat[weird_indexes[8], ])
+}
+
+plot(x, test_v_levels, type = "l", xlab = "v-level", ylab = "Function value")
+
+

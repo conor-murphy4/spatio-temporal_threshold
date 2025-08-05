@@ -705,8 +705,9 @@
 #   intensity_above0 <- future_covariates$dsmaxdt * exp(intensity_par[1] + intensity_par[2] * future_covariates$ICS_max)
 #   sigma0 <- gpd_par[1] + gpd_par[2] * future_covariates$ICS_max
 #   intensity_above_v <-  intensity_above0 * (1 + gpd_par[3] * (v) /sigma0 )^(-1 / gpd_par[3])
-#   # Do we need below?
+#  
 #   intensity_above_v[1 + gpd_par[3] * (v) / sigma0 < 0] <- 0
+#   intensity_above_v[sigma0 <= 0] <- 0
 #   # Calculate aggregated intensity
 #   agg_intensity_v <- sum(intensity_above_v, na.rm = TRUE) * grid_box_area
 #   
@@ -716,7 +717,7 @@
 # }
 # 
 # # v_level solver function
-# v_level_solver <- function(prob, future_covariates,  intensity_par, gpd_par, upper_limit = 10, grid_box_area = 0.2445286) {
+# v_level_solver <- function(prob, future_covariates,  intensity_par, gpd_par, grid_box_area = 0.2445286) {
 #   
 #   if(gpd_par[3] >= 0) {
 #     upper_limit <- 13
@@ -726,9 +727,10 @@
 #     endpoints <- -(gpd_par[1] + gpd_par[2] * future_covariates$ICS_max)/gpd_par[3]
 #     
 #     endpoint_max <- max(endpoints, na.rm = TRUE)
-#     v_solution <- optimize(v_level_extreme_event, interval = c(0, endpoint_max), prob = 0.9387, 
-#                            future_covariates = future_covariates, intensity_par = intensity_par, gpd_par=gpd_par)$minimum
+#     upper_limit <- endpoint_max
 #   }
+#   v_solution <- optimize(v_level_extreme_event, interval = c(0, upper_limit), prob = 0.9387, 
+#                           future_covariates = future_covariates, intensity_par = intensity_par, gpd_par=gpd_par)$minimum
 #   return(v_solution)
 # }
 # 
@@ -1069,3 +1071,107 @@
 # saveRDS(bootstrap_fits_Alg1, file="STORM_output/bootstrap_fits_Alg1_conservative.rds")
 # 
 # 
+
+
+# Future inference for conservative --------------------------------------------
+
+
+# Functions to evaluate endpoints -------------
+evaluate_endpoints <- function(future_covariates, intensity_par, gpd_par, grid_box_area = 0.2445286) {
+
+  if(gpd_par[3] >= 0) {
+    endpoint_summaries <- c(NA, NA)
+  }
+  else{
+    endpoints <- -(gpd_par[1] + gpd_par[2] * future_covariates$ICS_max)/gpd_par[3]
+
+    endpoint_max <- max(endpoints, na.rm = TRUE)
+
+    # weighted mean
+    intensity_above0 <- future_covariates$dsmaxdt * exp(intensity_par[1] + intensity_par[2] * future_covariates$ICS_max)
+
+    agg_intensity <- sum(intensity_above0, na.rm = TRUE)
+
+    # Calculate the weighted mean endpoint
+    endpoint_wm <- sum(endpoints * intensity_above0/agg_intensity , na.rm = TRUE)
+
+    endpoint_summaries <- c(endpoint_max, endpoint_wm)
+  }
+  return(endpoint_summaries)
+}
+
+
+# Functions for evaluated v level  ------------
+
+# v-level extreme event estimation
+v_level_extreme_event <- function(v, prob, future_covariates, intensity_par, gpd_par, grid_box_area = 0.2445286) {
+
+  intensity_above0 <- future_covariates$dsmaxdt * exp(intensity_par[1] + intensity_par[2] * future_covariates$ICS_max)
+  sigma0 <- gpd_par[1] + gpd_par[2] * future_covariates$ICS_max
+  intensity_above_v <-  intensity_above0 * (1 + gpd_par[3] * (v) /sigma0 )^(-1 / gpd_par[3])
+ 
+  intensity_above_v[1 + gpd_par[3] * (v) / sigma0 < 0] <- 0
+  intensity_above_v[sigma0 <= 0] <- 0
+  # Calculate aggregated intensity
+  agg_intensity_v <- sum(intensity_above_v, na.rm = TRUE) * grid_box_area
+
+  function_to_solve <- (exp(-agg_intensity_v) - prob)^2
+
+  return(function_to_solve)
+}
+
+# v_level solver function
+v_level_solver <- function(prob, future_covariates,  intensity_par, gpd_par, grid_box_area = 0.2445286) {
+
+  if(gpd_par[3] >= 0) {
+    upper_limit <- 13
+  }
+  else{
+    # Calculate the endpoints
+    endpoints <- -(gpd_par[1] + gpd_par[2] * future_covariates$ICS_max)/gpd_par[3]
+
+    endpoint_max <- max(endpoints, na.rm = TRUE)
+    if(endpoint_max > 13){
+      upper_limit <- 13
+    }
+    else{
+      upper_limit <- endpoint_max
+    }
+  }
+  v_solution <- optimize(v_level_extreme_event, interval = c(0, upper_limit), prob = 0.9387,
+                          future_covariates = future_covariates, intensity_par = intensity_par, gpd_par=gpd_par)$minimum
+  return(v_solution)
+}
+
+
+# Main script to run the uncertainty algorithm for STORM -----------------
+future_covariates <- read.csv("STORM_input/future_covariates_2024-2055.csv", header=T)
+bootstrap_estimates <- readRDS("STORM_input/bootstrap_fits_Alg1_conservative.rds") 
+
+library(parallel)
+
+summaries <- matrix(NA, nrow = length(bootstrap_estimates), ncol = 3)
+colnames(summaries) <- c("v_level", "endpoint_max", "endpoint_wm")
+
+cl <- makeCluster(100)  # Match this with your SBATCH -c value minus 1 ideally
+
+clusterExport(cl, varlist = c("future_covariates", "evaluate_endpoints", "v_level_solver", "v_level_extreme_event"), envir = environment())
+
+v_levels_list <- parLapply(cl, bootstrap_estimates, function(current_fits) {
+  v_level_solver(prob = 0.9387,
+                 future_covariates = future_covariates,
+                 intensity_par = current_fits$intensity_fit,
+                 gpd_par = current_fits$fit)
+})
+
+endpoints_list <- parLapply(cl, bootstrap_estimates, function(current_fits) {
+  evaluate_endpoints(future_covariates, current_fits$intensity_fit, current_fits$fit)
+})
+
+stopCluster(cl)
+
+summaries[, 1] <- unlist(v_levels_list)
+summaries[,2:3] <- do.call(rbind, endpoints_list)
+
+
+saveRDS(summaries, file="STORM_output/future_inferences_Alg1_conservative.rds")

@@ -324,3 +324,26 @@ resulting_intensity_const_thresh <- function(opt_PP, covariates){
   intensity_thresh <- covariates$dsmaxdt*exp(opt_PP$par[1] + opt_PP$par[2] * covariates$ICS)
   return(intensity_thresh)
 }
+
+
+
+# Endpoint estimates with CIs for magnitude 3.6
+gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
+
+bootstrap_fits_Alg1 <- readRDS("uncertainty/bootstrap_fits_Alg1.rds")
+bootstrap_fits_Alg1_B1 <- readRDS("uncertainty/bootstrap_fits_Alg1_B1.rds")
+bootstrap_fits_Alg1_C2 <- readRDS("uncertainty/bootstrap_fits_Alg1_C2.rds")
+
+par_ests_mat_A2 <- do.call(rbind, lapply(bootstrap_fits_Alg1, function(x) x$fit))
+par_ests_mat_B1 <- do.call(rbind, lapply(bootstrap_fits_Alg1_B1, function(x) x$fit))
+par_ests_mat_C2 <- do.call(rbind, lapply(bootstrap_fits_Alg1_C2, function(x) x$fit))
+
+gron_largest_eq <- gron_eq_cat[gron_eq_cat$Magnitude > 3.5,]
+
+endpoints_A2_at_largest <- -(par_ests_mat_A2[,1] + par_ests_mat_A2[,2] * gron_largest_eq$ICS_max) / par_ests_mat_A2[,3]
+endpoints_B1_at_largest <- -(par_ests_mat_B1[,1] + par_ests_mat_B1[,2] * gron_largest_eq$ICS_max) / par_ests_mat_B1[,3]
+endpoints_C2_at_largest <- -(par_ests_mat_C2[,1] + par_ests_mat_C2[,2] * gron_largest_eq$ICS_max) / par_ests_mat_C2[,3]
+
+(CI_endpoints_A2 <- quantile(endpoints_A2_at_largest, probs = c(0.025, 0.975)))
+(CI_endpoints_B1 <- quantile(endpoints_B1_at_largest, probs = c(0.025, 0.975)))
+(CI_endpoints_C2 <- quantile(endpoints_C2_at_largest, probs = c(0.025, 0.975)))
