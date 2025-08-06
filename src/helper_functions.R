@@ -32,7 +32,7 @@
 #' @export
 
 pgpd <- function(q, shape, scale = NULL, nu = NULL, mu = 0, skip_checks = FALSE){
-
+  
   if (!skip_checks) {
     # one and only one of {nu, scale} may be specified
     if (is.null(scale) & is.null(nu)) {
@@ -47,13 +47,13 @@ pgpd <- function(q, shape, scale = NULL, nu = NULL, mu = 0, skip_checks = FALSE)
       if (any(scale <= 0)) {
         stop('Implied scale parameter(s) must be positive.')
       }
-
+      
     }
     # Check that scale value(s) are positive
     if (any(scale <= 0)) {
       stop('Scale parameter(s) must be positive.')
     }
-
+    
     # Ensure q, scale, shape and mu are of same length.
     if (length(scale) == 1 & length(q) > 1) {
       scale <- rep(scale, length(q))
@@ -74,14 +74,14 @@ pgpd <- function(q, shape, scale = NULL, nu = NULL, mu = 0, skip_checks = FALSE)
   #correct probabilities below mu or above upper end point
   p[q < mu] <- 0
   p[(shape < 0) & (q >= (mu - scale/shape))] <- 1
-
+  
   #correct probabilities where xi = 0
   if (any(abs(shape) < 1e-10)) {
     #ex <- which(shape ==0)
     ex <- which(abs(shape) < 1e-10)
     p[ex] <- pexp(q = q[ex] - mu[ex], rate = 1 / scale[ex])
   }
-
+  
   return(p)
 }
 
@@ -112,21 +112,21 @@ qgpd <- function(p, shape, scale = NULL, nu = NULL, mu = 0){
   if (!is.null(scale) & !is.null(nu)) {
     stop('Define only one of the parameters nu and scale.')
   }
-
+  
   # Probabilities must all be positive
   if (!all((p >= 0) & (p <= 1))) {
     stop('Probabilities p must be in the range [0,1].')
   }
-
+  
   # Calculate scale from nu if required
   if (!is.null(nu) & is.null(scale)) {
     scale <- nu / (1 + shape)
     if (any(scale <= 0)) {
       stop('Implied scale parameter(s) must be positive.')
     }
-
+    
   }
-
+  
   # Check that scale value(s) are positive
   if (any(scale <= 0)) {
     stop('Scale parameter(s) must be positive.')
@@ -141,10 +141,10 @@ qgpd <- function(p, shape, scale = NULL, nu = NULL, mu = 0){
   if (length(mu) == 1 & length(p) > 1) {
     mu <- rep(mu, length(p))
   }
-
+  
   #calculate quantiles
   q <- mu + (scale/shape) * ((1 - p)^(-shape) - 1)
-
+  
   #correct quantiles where xi = 0
   #ex <- which(shape ==0)
   if (any(abs(shape) < 1e-10)) {
@@ -184,7 +184,7 @@ dgpd <- function(x, shape, scale = NULL, nu = NULL, mu = 0, log = FALSE){
   if (!is.null(scale) & !is.null(nu)) {
     stop('Define only one of the parameters nu and scale.')
   }
-
+  
   # Calculate scale from nu if required
   if (!is.null(nu) & is.null(scale)) {
     scale <- nu / (1 + shape)
@@ -192,7 +192,7 @@ dgpd <- function(x, shape, scale = NULL, nu = NULL, mu = 0, log = FALSE){
       stop('Implied scale parameter(s) must be positive.')
     }
   }
-
+  
   # Check that scale value(s) are positive
   if (any(scale <= 0)) {
     stop('Scale parameter(s) must be positive.')
@@ -207,7 +207,7 @@ dgpd <- function(x, shape, scale = NULL, nu = NULL, mu = 0, log = FALSE){
   if (length(mu) == 1 & length(x) > 1) {
     mu <- rep(mu, length(x))
   }
-
+  
   if (log == FALSE) {
     out <- (scale^(-1)) * pmax((1 + shape * (x - mu)/scale),0)^((-1/shape) - 1)
     # amend values below threshold
@@ -282,7 +282,7 @@ rgpd <- function(n, shape, scale = NULL, nu = NULL, mu = 0){
   if ((length(mu) == 1) & (n > 1)) {
     mu <- rep(mu, n)
   }
-
+  
   #simulate sample
   sample <- mu + (scale/shape) * ((1 - stats::runif(n))^(-shape) - 1)
   #correct sample values where xi = 0
@@ -320,20 +320,20 @@ rgpd <- function(n, shape, scale = NULL, nu = NULL, mu = 0){
 #' # CAUTION:
 #' gpd_rd(x = 0.15, to_nearest = 0.1,  u = 0, sig_u = 1, xi = 0)
 dgpd_rd <- function(x, u, sig_u, xi, to_nearest){
-
+  
   # If (Y_i - u_i | Y_i > u_i) ~ GPD(sig_i, xi)
   # then Z_i  = [(Y_i - u_i)/sig_i | Y_i - u_i > 0] ~ GPD(1, xi)
-
+  
   # range of z values that lead to observing x
   x_low <- pmax(x - to_nearest/2, u)
   z_low <- (x_low - u) / sig_u
   z_high <- (x - u + to_nearest/2)/sig_u
-
+  
   # calculate probability of z in that range
   p_high <- pgpd(q = z_high, scale = 1, shape = xi, mu = 0)
   p_low  <- pgpd(q = z_low,  scale = 1, shape = xi, mu = 0)
   p <- p_high - p_low
-
+  
   return(p)
 }
 
@@ -380,112 +380,6 @@ transform_to_exp <- function (y, sig, xi){
   return(std_exp)
 }
 
-GPD_LL_given_V <- function(par, excess, thresh_par, V, min_dist = 0, max_dist = 33.782){
-  #Current min and max distances are conservative and should be updated based on Stephen's guidance
-  
-  if(length(par)!=2) stop("par must be a vector of length 2")
-  if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
-  if (!is.numeric(excess)) stop("excess must be a vector")
-  if (!is.numeric(V)) stop("V must be vector")
-  if(length(excess) != length(V)) stop("excess and V must be the same length")
-  if(length(min_dist)!=1) stop("min_dist must be a scalar")
-  if(length(max_dist)!=1) stop("max_dist must be a scalar")
-  
-  sigma<-par[1]
-  xi<-par[2]
-  
-  sigma_tilde <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
-  
-  #Extra conditions to check for spatio-temporal model
-  sigma_max <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*max_dist)
-  sigma_min <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*min_dist)
-  
-  sigma_check <- c(sigma, sigma_min, sigma_max, sigma_tilde)
-  
-  if(all(sigma_check>0)){
-    if(abs(xi)<1e-10){
-      return(-sum(log(sigma_tilde))-sum(excess/sigma_tilde))
-    }
-    else{
-      if(all(1+(xi*excess)/sigma_tilde >0)){
-        return(-sum(log(sigma_tilde))-(1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
-      }
-      else{
-        return(-1e6)
-      }
-    }
-  }
-  else{
-    return(-1e7)
-  }
-}
-
-GPD_LL_given_V_unconstrained <- function(par, excess, thresh_par, V){
-  
-  if(length(par)!=2) stop("par must be a vector of length 2")
-  if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
-  if (!is.numeric(excess)) stop("excess must be a vector")
-  if (!is.numeric(V)) stop("V must be vector")
-  if(length(excess) != length(V)) stop("excess and V must be the same length")
-  #if(length(min_dist)!=1) stop("min_dist must be a scalar")
-  #if(length(max_dist)!=1) stop("max_dist must be a scalar")
-  
-  sigma<-par[1]
-  xi<-par[2]
-  
-  sigma_tilde <- sigma + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
-  
-  sigma_check <- c(sigma, sigma_tilde)
-  
-  if(all(sigma_check>0)){
-    if(abs(xi)<1e-10){
-      return(-sum(log(sigma_tilde))-sum(excess/sigma_tilde))
-    }
-    else{
-      if(all(1+(xi*excess)/sigma_tilde >0)){
-        return(-sum(log(sigma_tilde))-(1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
-      }
-      else{
-        return(-1e6)
-      }
-    }
-  }
-  else{
-    return(-1e7)
-  }
-}
-
-GPD_LL_step <- function(par, excess, thresh){
-  #Current min and max distances are conservative and should be updated based on Stephen's guidance
-  
-  if(length(par)!=2) stop("par must be a vector of length 2")
-  #if(length(thresh)!=length(excess)) stop("excess and thresh must be the same length")
-  if (!is.numeric(excess)) stop("excess must be a vector")
- 
-  sigma<-par[1]
-  xi<-par[2]
-  
-  sigma_tilde <- sigma + xi*(thresh)
-  
-  sigma_check <- c(sigma, sigma_tilde)
-  
-  if(all(sigma_check>0)){
-    if(abs(xi)<1e-10){
-      return(-sum(log(sigma_tilde))-sum(excess/sigma_tilde))
-    }
-    else{
-      if(all(1+(xi*excess)/sigma_tilde >0)){
-        return(-sum(log(sigma_tilde))-(1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
-      }
-      else{
-        return(-1e6)
-      }
-    }
-  }
-  else{
-    return(-1e7)
-  }
-}
 
 #Get par ests and delta confidence intervals
 
@@ -509,14 +403,14 @@ get_par_ests <- function(mags, threshold, show_fit = TRUE){
 }
 
 
-get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, min_ics = 0, max_dist = 33.782, show_fit = TRUE){
+get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, show_fit = TRUE){
   threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
   V_excess <- V[mags > threshold]
   ics_excess <- ics[mags > threshold]
   mle0 <- mean(excesses)
   gpd_fit <- optim(GPD_LL_given_V_ICS, excess = excesses, par = c(mle0,0,0.1), control = list(fnscale = -1), thresh_par=thresh_fit$thresh_par, 
-                   V = V_excess, ics = ics_excess, min_ics = min_ics, max_dist = max_dist , hessian = TRUE)
+                   V = V_excess, ics = ics_excess, hessian = TRUE)
   check <- gpd_fit$par[1] == thresh_fit$par[1] & gpd_fit$par[2] == thresh_fit$par[2] & gpd_fit$par[3] == thresh_fit$par[3]
   if(!check){
     print(gpd_fit$par)
@@ -641,78 +535,6 @@ get_pp_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "
   
 }
 
-get_eqd_value <- function(mags, threshold, par, SEED = 11111, num_boot = 200, m = 500, step = FALSE){
-  sigma <- par[1]
-  xi <- par[2]
-  excesses <- mags[mags > threshold] - threshold[mags > threshold]
-  distances <- numeric(num_boot)
-  set.seed(SEED)
-  for (j in 1:num_boot) {
-    sample_indices <- sample(c(1:length(excesses)), length(excesses), replace = TRUE)
-    boot_excesses <- excesses[sample_indices]
-    mle <- mean(boot_excesses)
-    ifelse(xi < 0, pars_init <-  c(mle, 0.1) ,pars_init <- c(sigma, xis[i]) )
-    if(step == TRUE){
-      thresh_boot <- threshold[mags > threshold][sample_indices]
-      gpd.fit <- optim(GPD_LL_step, excess = boot_excesses, par = pars_init, control = list(fnscale = -1), thresh = thresh_boot)
-      sigma_tilde <- gpd.fit$par[1] + gpd.fit$par[2]*thresh_boot
-      excesses_exp <- transform_to_exp(y = boot_excesses, sig = sigma_tilde, xi = gpd.fit$par[2])
-    }
-    else{
-      gpd.fit <- optim(GPD_LL, z = boot_excesses, par = pars_init, control = list(fnscale = -1))
-      excesses_exp <- transform_to_exp(y = boot_excesses, sig = gpd.fit$par[1], xi = gpd.fit$par[2])
-    }
-    sample_quants <- quantile(excesses_exp, probs = (1:m)/(m+1))
-    model_quants <- qexp(p = (1:m)/(m+1), rate = 1)
-    distances[j] <- mean(abs(sample_quants - model_quants))
-  }
-  eqd_value <- mean(distances)
-  return(eqd_value)
-}
-
-
-GPD_LL_given_V_ICS_max_dist <- function(par, excess, thresh_par, V, ics, max_dist = 33.782, min_ics = 0){
-  # Max distance taken above as length of gas field while min_ics is taken as 0, may need updating
-  
-  if(length(par)!=3) stop("par must be a vector of length 3")
-  if(length(thresh_par)!=2) stop("thresh must be a vector of length 2")
-  if (!is.numeric(excess)) stop("excess must be a vector")
-  if (!is.numeric(V)) stop("V must be vector")
-  if (!is.numeric(ics)) stop("ics must be vector")
-  if(length(excess) != length(V)) stop("excess and V must be the same length")
-  if(length(excess) != length(ics)) stop("excess and ics must be the same length")
-  if(length(max_dist)!=1) stop("max_dist must be a scalar")
-  if(length(min_ics)!=1) stop("min_ics must be a scalar")
-  
-  sigma_par <- par[1:2]
-  xi <- par[3]
-  
-  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
-  
-  sigma_tilde <- sigma_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
-  
-  #Extra conditions to check for spatio-temporal model 
-  sigma_min <- sigma_par[1] + sigma_par[2]*min_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*max_dist)
-  
-  sigma_check <- c(sigma_ics, sigma_min, sigma_tilde)
-  
-  if(all(sigma_check>0) & xi > -0.9){
-    if(abs(xi)<1e-10){
-      return(-sum(log(sigma_tilde))-sum(excess/sigma_tilde))
-    }
-    else{
-      if(all(1+(xi*excess)/sigma_tilde > 0)){
-        return(-sum(log(sigma_tilde))-(1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
-      }
-      else{
-        return(-1e6)
-      }
-    }
-  }
-  else{
-    return(-1e7)
-  }
-}
 
 GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
   
@@ -733,7 +555,7 @@ GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
   
   sigma_check <- c(sigma_ics, sigma_tilde)
   
-  if(all(sigma_check > 0) & xi > -0.9){
+  if(all(sigma_check > 0) & xi > -0.9 & sigma_par[2] >= 0){
     if(abs(xi) < 1e-10){
       return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))
     }
@@ -749,101 +571,4 @@ GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
   else{
     return(-1e7)
   }
-}
-
-GPD_LL_ICS_constant_thresh <- function(par, excess, ics, thresh, min_ics = 0){
-  
-  if(length(par)!=3) stop("par must be a vector of length 3")
-  if (!is.numeric(excess)) stop("excess must be a vector")
-  if (!is.numeric(ics)) stop("ics must be vector")
-  if(length(excess) != length(ics)) stop("excess and ics must be the same length")
-  
-  sigma_par <- par[1:2]
-  xi <- par[3]
-  
-  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
-  
-  sigma_tilde <- sigma_ics + xi*(thresh)
-  
-  sigma_min <- sigma_par[1] + sigma_par[2]*min_ics
-  
-  sigma_check <- c(sigma_min, sigma_ics, sigma_tilde)
-  
-  if(all(sigma_check > 0)){
-    if(abs(xi) < 1e-10){
-      return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))
-    }
-    else{
-      if(all(1+(xi*excess)/sigma_tilde > 0)){
-        return(-sum(log(sigma_tilde)) - (1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
-      }
-      else{
-        return(-1e6)
-      }
-    }
-  }
-  else{
-    return(-1e7)
-  }
-}
-
-
-GPD_LL_ICS_constant_thresh_const_shape <- function(par, excess, ics, thresh, shape){
-  
-  if(length(par)!=2) stop("par must be a vector of length 2")
-  if (!is.numeric(excess)) stop("excess must be a vector")
-  if (!is.numeric(ics)) stop("ics must be vector")
-  if(length(excess) != length(ics)) stop("excess and ics must be the same length")
-  
-  sigma_par <- par[1:2]
-  xi <- shape
-  
-  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
-  
-  sigma_tilde <- sigma_ics + xi*(thresh)
-  
-  sigma_check <- c(sigma_ics, sigma_tilde)
-  
-  if(all(sigma_check > 0)){
-    if(abs(xi) < 1e-10){
-      return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))
-    }
-    else{
-      if(all(1+(xi*excess)/sigma_tilde > 0)){
-        return(-sum(log(sigma_tilde)) - (1+1/xi)*(sum(log(1+(xi*excess)/sigma_tilde))))
-      }
-      else{
-        return(-1e6)
-      }
-    }
-  }
-  else{
-    return(-1e7)
-  }
-}
-
-
-get_table_of_results <- function(mags, threshold){
-  thresh_par <- unique(threshold)
-  par_ests <- get_par_ests_step(mags, threshold)
-  num_excess <- sum(mags > threshold)
-  eqd_val <- get_eqd_value(mags, threshold, par = par_ests$par)
-  return(list(thresh_par, num_excess, eqd_val, par_ests))
-  
-}
-
-# Instructions:
-# - Change the list_of_fits to the desired threshold
-# - Change the dist_matrix to the desired distance matrix
-# - The entries in the returned list correspond to V1-V4 
-get_table_of_results_geo_ics <- function(mags, list_of_fits, dist_matrix, ics, min_ics, max_dists){
-  table_results <- vector("list", 4)
-  for(i in 1:4){
-    chosen_thresh <- list_of_fits[[i]]$thresh_par
-    par_ests <- get_par_ests_geo_ics(mags, list_of_fits[[i]], dist_matrix[,i], ics, min_ics, max_dist = max_dists[i])
-    num_excess <- list_of_fits[[i]]$num_excess
-    eqd_val <- min(list_of_fits[[i]]$dists, na.rm = TRUE)
-    table_results[[i]] <- list(chosen_thresh, num_excess, eqd_val, par_ests) 
-  }
-  return(table_results)
 }
