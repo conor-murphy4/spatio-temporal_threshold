@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# automated_threshold_selection
+# spatio-temporal_threshold_selection
 
 <!-- badges: start -->
 <!-- badges: end -->
