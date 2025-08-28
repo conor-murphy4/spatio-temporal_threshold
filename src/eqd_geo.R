@@ -30,54 +30,86 @@ eqd_geo_ics <- function(data, thresh, distance_to_geo, ics, k = 100, m = 500, un
   if (k <= 0 | k %% 1 != 0) stop("Number of bootstrapped samples must be a positive integer")
   if (m <= 0 | m %% 1 != 0) stop("Number of equally spaced probabilities must be a positive integer")
   
-  meandistances <- xis <- num_excess <- numeric(nrow(thresh))
+  # create storage for outputs
+  mean_distances <- xis <- num_excess <- numeric(nrow(thresh))
   sigma_par <- matrix(NA, nrow = nrow(thresh), ncol = 2)
+  
   for (i in 1:nrow(thresh)) {
+    
     u <- thresh[i,1] + thresh[i,2] * distance_to_geo
-    if(any(u < underlying_thresh)) stop(paste("Candidate thresholds must be above the underlying threshold of ", underlying_thresh))
+    
+    stopifnot(all(u >= underlying_thresh))
+    
     excess <- data[data > u] - u[data > u]
     V_excess <- distance_to_geo[data > u]
     ICS_excess <- ics[data > u]
+    
     num_excess[i] <- length(excess)
-    if (num_excess[i] > 20) {
+    
+    if (num_excess[i] <= 20) {
+      mean_distances[i] <- NA
+    } else {
       mle0 <- mean(excess)
-      init.fit <- optim(GPD_LL_given_V_ICS, excess = excess, par = c(mle0, 0, 0.1), control = list(fnscale = -1), 
-                        thresh_par=thresh[i,], V = V_excess, ics=ICS_excess)
+      
+      init.fit <- optim(fn = GPD_LL_given_V_ICS,
+                        excess = excess,
+                        par = c(mle0, 0, 0.1),
+                        control = list(fnscale = -1), 
+                        thresh_par = thresh[i,],
+                        V = V_excess,
+                        ics = ICS_excess)
+      
       xis[i] <- init.fit$par[3]
       sigma_par[i,] <- init.fit$par[1:2]
+      
       distances <- numeric(k)
       j <- 1
-      while(j  <= k) {
+      while (j <= k) {
         sampled_indices <- sample(1:num_excess[i], num_excess[i], replace = TRUE)
         excess_boot <- excess[sampled_indices]
         V_excess_boot <- V_excess[sampled_indices]
         ICS_excess_boot <- ICS_excess[sampled_indices]
         init_mle <- mean(excess_boot)
-        ifelse(xis[i] < 0, pars_init <-  c(init_mle, 0, 0.1) ,pars_init <- c(sigma_par[i,], xis[i]) )
-        gpd.fit <- optim(GPD_LL_given_V_ICS, excess = excess_boot, par = pars_init, control = list(fnscale = -1), 
-                         thresh_par=thresh[i,], V = V_excess_boot, ics = ICS_excess_boot)
-        sigma_given_V <- gpd.fit$par[1] + gpd.fit$par[2]*ICS_excess_boot + gpd.fit$par[3] * (thresh[i,1] + thresh[i,2]*V_excess_boot)
-        if(any((1 + gpd.fit$par[3] * excess_boot/sigma_given_V) < 1e-323)) next
+        ifelse(xis[i] < 0, 
+               yes = pars_init <- c(init_mle, 0, 0.1),
+               no = pars_init <- c(sigma_par[i,], xis[i]) )
+        
+        gpd.fit <- optim(GPD_LL_given_V_ICS,
+                         excess = excess_boot,
+                         par = pars_init,
+                         control = list(fnscale = -1), 
+                         thresh_par = thresh[i,],
+                         V = V_excess_boot,
+                         ics = ICS_excess_boot)
+        
+        sigma_given_V <- gpd.fit$par[1] + gpd.fit$par[2]*ICS_excess_boot +
+          gpd.fit$par[3] * (thresh[i,1] + thresh[i,2]*V_excess_boot)
+        
+        if (any((1 + gpd.fit$par[3] * excess_boot/sigma_given_V) < 1e-323)) next
         else{
-          transformed_excess_boot <- transform_to_exp(y = excess_boot, sig = sigma_given_V, xi = gpd.fit$par[3])
-          sample_quants <- quantile(transformed_excess_boot, probs = (1:m) / (m+1))
-          model_quants <- qexp((1:m) / (m+1), rate = 1)
+          transformed_excess_boot <- transform_to_exp(y = excess_boot,
+                                                      sig = sigma_given_V,
+                                                      xi = gpd.fit$par[3])
+          sample_quants <- quantile(transformed_excess_boot, probs = (1:m) / (m + 1))
+          model_quants <- qexp((1:m) / (m + 1), rate = 1)
           distances[j] <- mean(abs(sample_quants - model_quants))
           j <- j + 1
         }
       }
-      meandistances[i] <- mean(distances)
-    }
-    else{
-      meandistances[i] <- NA
+      mean_distances[i] <- mean(distances)
     }
   }
-  chosen_index <- which.min(meandistances)
+  
+  # Return details of threshold with minimum expected distances
+  chosen_index <- which.min(mean_distances)
   chosen_threshold_par <- thresh[chosen_index,]
   xi <- xis[chosen_index]
   sigmas <- sigma_par[chosen_index,]
   len <- num_excess[chosen_index]
-  result <- list(thresh_par = chosen_threshold_par, par = c(sigmas,xi), num_excess = len, dists = meandistances)
+  result <- list(thresh_par = chosen_threshold_par,
+                 par = c(sigmas,xi),
+                 num_excess = len,
+                 dists = mean_distances)
   return(result)
 }
 
