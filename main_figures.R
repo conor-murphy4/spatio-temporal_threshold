@@ -2,13 +2,13 @@
 
 # Load required datasets -------------------------------------------------------
 file_paths <- list(
-  gron_eq_cat = "Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv",
-  covariates = "Data/covariates/covariates_1995-2024.csv",
-  covariates_2025 = "Data/covariates/covariates_1995-2055.csv",
-  geophones_deepest = "Data/Geophones/Geophones_processed_03-07-2024_deepest_only.csv",
-  gron_outline = "Data/Geophones/Groningen_Field_outline.csv",
-  gron_polygon = "Data/Geophones/polygon_for_groningen_earthquakes.txt", 
-  covariates_in_G = "Data/covariates/covariates_in_gasfield_1995-2024.csv"
+  gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
+  covariates = "data/covariates/covariates_1995-2024.csv",
+  covariates_2025 = "data/covariates/covariates_1995-2055.csv",
+  geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
+  gron_outline = "data/geophones/Groningen_Field_outline.csv",
+  gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
+  covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv"
 )
 
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
