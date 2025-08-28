@@ -30,7 +30,8 @@ To run this code, several R packages are required which may be installed using t
           "cowplot",
           "dplyr",
           "purrr",
-          "patchwork"
+          "patchwork",
+          "stringr"
         )
         
     install.packages(required_pkgs)

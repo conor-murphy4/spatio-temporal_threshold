@@ -23,7 +23,8 @@ using the following code:
           "cowplot",
           "dplyr",
           "purrr",
-          "patchwork"
+          "patchwork",
+          "stringr"
         )
         
     install.packages(required_pkgs)
