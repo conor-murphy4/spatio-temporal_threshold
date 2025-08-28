@@ -4,3 +4,9 @@
 .RData
 .Ruserdata
 spatio-temporal_threshold.Rproj
+
+# Large CSV files 
+
+data/covariates/covariates_1995-2024.csv
+data/covariates/covariates_1995-2055.csv
+data/covariates/future_covariates_2024-2055.csv
