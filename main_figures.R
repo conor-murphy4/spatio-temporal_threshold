@@ -1,13 +1,27 @@
+# Code to reproduce figures in the main text 
 
-gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
-covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
-covariates_2055 <- read.csv("Data/covariates/covariates_1995-2055.csv", header=T)
-geophones_deepest <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_deepest_only.csv", header=T, row.names=1)
-gron_outline <- read.csv('Data/Geophones/Groningen_Field_outline.csv', header=T)
-gron_polygon <- read.table('Data/Geophones/polygon_for_groningen_earthquakes.txt', header=T)
-gron_rect <- data.frame(X=c(210000,275000, 275000, 210000, 210000), Y=c(560000, 560000, 625000, 625000, 560000))
-covariates_in_G <- read.csv("Data/covariates/covariates_in_gasfield_1995-2024.csv", header=T)
+# Load required datasets -------------------------------------------------------
+file_paths <- list(
+  gron_eq_cat = "Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv",
+  covariates = "Data/covariates/covariates_1995-2024.csv",
+  covariates_2025 = "Data/covariates/covariates_1995-2055.csv",
+  geophones_deepest = "Data/Geophones/Geophones_processed_03-07-2024_deepest_only.csv",
+  gron_outline = "Data/Geophones/Groningen_Field_outline.csv",
+  gron_polygon = "Data/Geophones/polygon_for_groningen_earthquakes.txt", 
+  covariates_in_G = "Data/covariates/covariates_in_gasfield_1995-2024.csv"
+)
 
+gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
+covariates <- read.csv(file_paths$covariates, header = TRUE)
+covariates_2055 <- read.csv(file_paths$covariates_2025, header = TRUE)
+geophones_deepest <- read.csv(file_paths$geophones_deepest, header = TRUE, row.names = 1)
+gron_outline <- read.csv(file_paths$gron_outline, header = TRUE)
+gron_polygon <- read.table(file_paths$gron_polygon, header = TRUE)
+gron_rect <- data.frame(X = c(210000, 275000, 275000, 210000, 210000),
+                        Y = c(560000, 560000, 625000, 625000, 560000))
+covariates_in_G <- read.csv(file_paths$covariates_in_G, header = TRUE)
+
+# load required libraries and functions ----------------------------------------
 library(ggplot2)
 library(ggspatial)
 library(pracma)
