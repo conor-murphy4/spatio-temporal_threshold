@@ -11,6 +11,9 @@ file_paths <- list(
   covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv"
 )
 
+chosen_years <- c("2010", "2020") # in Figure 2, plot geophone networks in these years
+
+
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
 covariates <- read.csv(file_paths$covariates, header = TRUE)
 covariates_2055 <- read.csv(file_paths$covariates_2025, header = TRUE)
@@ -36,53 +39,93 @@ source("src/intensity_estimation.R")
 
 # Figure 1 ----------------------------------------------------------------
 
-# changepoint threshold
+# changepoint threshold and earthquake locations
 change_index <- which(gron_eq_cat$Date == as.Date("2015-12-25"))
-pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat)-change_index))
+pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat) - change_index))
 
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,2), bg='transparent')
-plot(as.Date(gron_eq_cat$Date),gron_eq_cat$Magnitude, xlab="Time", ylab = expression(Magnitude~(M[L])), pch=19, col="grey", cex=0.7)
-lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
+dev.new(height = 5, width = 10, noRStudioGD = TRUE)
+par(mfrow = c(1, 2), bg = 'transparent')
+plot(
+  x = as.Date(gron_eq_cat$Date),
+  y = gron_eq_cat$Magnitude,
+  xlab = "Time",
+  ylab = expression(Magnitude~(M[L])),
+  pch = 19,
+  col = "grey",
+  cex = 0.7)
+lines(
+  x = as.Date(gron_eq_cat$Date),
+  y = rep(1.45, nrow(gron_eq_cat)),
+  col = "red",
+  lty = 2,
+  lwd = 2)
+lines(x = as.Date(gron_eq_cat$Date), y = pc_threshold, col = "blue", lwd = 2)
 
-plot(gron_polygon$POINT_X, gron_polygon$POINT_Y, col="green", xlab="Easting (m)", ylab = "Northing (m)", type = 'l', lty=2, asp=1, lwd=2)
-points(gron_eq_cat$Easting, gron_eq_cat$Northing, pch=19, col="grey", cex=0.7, asp=1)
-lines(gron_outline$X, gron_outline$Y, col="black", asp=1)
+plot( 
+  x = gron_polygon$POINT_X,
+  y = gron_polygon$POINT_Y,
+  col = "green",
+  xlab = "Easting (m)",
+  ylab = "Northing (m)",
+  type = 'l',
+  lty = 2,
+  asp = 1,
+  lwd = 2)
+points(x = gron_eq_cat$Easting, y = gron_eq_cat$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
+lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black", asp = 1)
 
 # Figure 2 ----------------------------------------------------------------
 
 # Number of geophones over time
-dates <- seq(min(as.Date(gron_eq_cat$Date)), max(as.Date(gron_eq_cat$Date)), by="day")
+dates <- seq(from = min(as.Date(gron_eq_cat$Date)),
+             to = max(as.Date(gron_eq_cat$Date)),
+             by = "day")
 num_geophones_in_rect <- numeric(length(dates))
 num_geophones_in_polygon <- numeric(length(dates))
 num_geophones_in_gasfield <- numeric(length(dates))
+
+# subset of geophones belonging to each spatial region
 geophones_in_rect <- geophones_deepest[inpolygon(geophones_deepest$Xcoord, geophones_deepest$Ycoord, gron_rect$X, gron_rect$Y),]
 geophones_in_polygon <- geophones_deepest[inpolygon(geophones_deepest$Xcoord, geophones_deepest$Ycoord, gron_polygon$POINT_X, gron_polygon$POINT_Y),]
 geophones_in_gasfield <- geophones_deepest[inpolygon(geophones_deepest$Xcoord, geophones_deepest$Ycoord, gron_outline$Easting, gron_outline$Northing),]
-for(i in 1:length(dates)){
+
+filter_to_date <- function(df, date){df[df$Start_date <= date & df$End_date >= date,]}
+for (i in seq_along(dates)) {
   date <- dates[i]
-  current_geo_in_rect <- geophones_in_rect[geophones_in_rect$Start_date <= date & geophones_in_rect$End_date >= date,]
-  current_geo_in_polygon <- geophones_in_polygon[geophones_in_polygon$Start_date <= date & geophones_in_polygon$End_date >= date,]
-  current_geo_in_gasfield <- geophones_in_gasfield[geophones_in_gasfield$Start_date <= date & geophones_in_gasfield$End_date >= date,]
-  num_geophones_in_rect[i] <- nrow(current_geo_in_rect)
-  num_geophones_in_polygon[i] <- nrow(current_geo_in_polygon)
-  num_geophones_in_gasfield[i] <- nrow(current_geo_in_gasfield)
+  num_geophones_in_rect[i] <- filter_to_date(geophones_in_rect, date) |> nrow()
+  num_geophones_in_polygon[i] <- filter_to_date(geophones_in_polygon, date) |> nrow()
+  num_geophones_in_gasfield[i] <- filter_to_date(geophones_in_gasfield, date) |> nrow()
 }
 
-dev.new(height=5, width=15, noRStudioGD = TRUE)
-par(mfrow=c(1,3), bg='transparent')
-plot(dates, num_geophones_in_rect, xlab="Time", ylab = "Number of geophones", type='l', col="blue")
-lines(dates, num_geophones_in_polygon, col="green")
-lines(dates, num_geophones_in_gasfield, col="black")
+dev.new(height = 5, width = 15, noRStudioGD = TRUE)
+par(mfrow = c(1, 3), bg = 'transparent')
+plot(
+  x = dates,
+  y = num_geophones_in_rect,
+  xlab = "Time",
+  ylab = "Number of geophones",
+  type = 'l',
+  col = "blue")
+lines(x = dates, y = num_geophones_in_polygon, col = "green")
+lines(x = dates, y = num_geophones_in_gasfield, col = "black")
 
 # Spatial plots of geophones active in particular years
-chosen_years <- c("2010", "2020")
-for(year in chosen_years){
-  current_geophones <- geophones_deepest[stringr::str_sub(geophones_deepest$Start_date, 1, 4) <= year & stringr::str_sub(geophones_deepest$End_date, 1, 4) >= year,]
-  plot(gron_polygon$POINT_X, gron_polygon$POINT_Y, col="green", xlab="Easting (m)", ylab = "Northing (m)", type = 'l', lty=2, lwd=2, asp=1)
-  points(current_geophones$Xcoord, current_geophones$Ycoord, pch=4, col="blue", cex=0.7)
-  lines(gron_outline$X, gron_outline$Y, col="black")
+for (year in chosen_years) {
+  is_in_year <- stringr::str_sub(geophones_deepest$Start_date, 1, 4) <= year &
+                stringr::str_sub(geophones_deepest$End_date, 1, 4) >= year
+  current_geophones <- geophones_deepest[is_in_year,]
+  plot(
+    x = gron_polygon$POINT_X, 
+    y = gron_polygon$POINT_Y,
+    col = "green",
+    xlab = "Easting (m)",
+    ylab = "Northing (m)",
+    type = 'l',
+    lty = 2,
+    lwd = 2,
+    asp = 1)
+  points(x = current_geophones$Xcoord, y = current_geophones$Ycoord, pch = 4, col = "blue", cex = 0.7)
+  lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black")
 }
 
 
