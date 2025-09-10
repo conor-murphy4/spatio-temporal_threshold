@@ -313,22 +313,17 @@ rgpd <- function(n, shape, scale = NULL, nu = NULL, mu = 0){
 GPD_LL <- function(par, z){
   sigma <- par[1]
   xi <- par[2]
-  if (sigma > 0) {
-    if (abs(xi) < 1e-10) {
-      return(-length(z) * log(sigma) - ((1 / sigma) * sum(z)))
-    }
-    else {
-      if (all(1 + (xi * z) / sigma > 0)) {
-        return(-(length(z) * log(sigma)) - ((1 + 1 / xi)*(sum(log(1 + (xi * z) / sigma)))))
-      }
-      else{
-        return(-1e6)
-      }
-    }
+  if (sigma < 0) {return(-1e7)}
+  
+  if (abs(xi) < 1e-10) {
+    return(-length(z) * log(sigma) - ((1 / sigma) * sum(z)))
   }
-  else{
-    return(-1e7)
-  }
+  
+  if (any(1 + (xi * z) / sigma <= 0)) {return(-1e6)}
+  
+  LL1 <- -(length(z) * log(sigma))
+  LL2 <- -((1 + 1 / xi) * (sum(log(1 + (xi * z) / sigma))))
+  return(LL1 + LL2)    
 }
 
 
@@ -386,8 +381,8 @@ get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, show_fit = TRUE){
                    hessian = TRUE)
   
   check <- gpd_fit$par[1] == thresh_fit$par[1] &
-           gpd_fit$par[2] == thresh_fit$par[2] &
-           gpd_fit$par[3] == thresh_fit$par[3]
+    gpd_fit$par[2] == thresh_fit$par[2] &
+    gpd_fit$par[3] == thresh_fit$par[3]
   if (!check) { print(gpd_fit$par); print("Parameter estimates don't agree") }
   
   hessian <- gpd_fit$hessian
@@ -405,7 +400,7 @@ get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, show_fit = TRUE){
     CI_shape = round(c(lower[3], upper[3]), 3))
   
   if (show_fit) {output$fit <- gpd_fit}
- 
+  
   return(output)
 }
 
@@ -418,8 +413,8 @@ get_qq_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
   ics_excess <- ics[mags > threshold]
   sigma_tilde <- thresh_fit$par[1] + 
-                 thresh_fit$par[2] * ics_excess + 
-                 thresh_fit$par[3] * threshold[mags > threshold]
+    thresh_fit$par[2] * ics_excess + 
+    thresh_fit$par[3] * threshold[mags > threshold]
   
   transformed_excess <- transform_to_exp(y = excesses,
                                          sig = sigma_tilde,
@@ -528,8 +523,8 @@ get_pp_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
   ics_excess <- ics[mags > threshold]
   sigma_tilde <- thresh_fit$par[1] + 
-                 thresh_fit$par[2] * ics_excess +
-                 thresh_fit$par[3] * threshold[mags > threshold]
+    thresh_fit$par[2] * ics_excess +
+    thresh_fit$par[3] * threshold[mags > threshold]
   
   transformed_excess <- transform_to_exp(y = excesses,
                                          sig = sigma_tilde,
@@ -580,14 +575,14 @@ GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
   sigma_tilde <- sigma_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
   sigma_check <- c(sigma_ics, sigma_tilde)
   
-  if (any(sigma_check > 0) & xi > -0.9 & sigma_par[2] < 0) {return(-1e7)}
+  if (any(sigma_check < 0) || xi <= -0.9 || sigma_par[2] < 0) {return(-1e7)}
   
   if (abs(xi) < 1e-10) {return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))}
-   
+  
   if (any(1 + (xi * excess) / sigma_tilde <= 0)) {return(-1e6)}
   
   LL1 <- -sum(log(sigma_tilde))
   LL2 <- -(1 + 1 / xi) * (sum(log(1 + (xi * excess) / sigma_tilde)))
   return(LL1 + LL2)
-      
+  
 }
