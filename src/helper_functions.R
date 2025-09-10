@@ -326,14 +326,33 @@ GPD_LL <- function(par, z){
   return(LL1 + LL2)    
 }
 
-
+#' Transform GPD excesses to standard exponential
+#' 
+#' @author Conor Murphy
+#' 
+#' @param y A numeric vector of excesses of some threshold.
+#' @param sig A numeric value or vector of values of the scale parameter.
+#' @param xi A numeric value or vector of values of the shape parameter.
+#' 
+#' @returns A numeric vector of transformed excesses.
 transform_to_exp <- function(y, sig, xi){
+  
+  if (length(sig) != length(y) & length(sig) != 1) {stop("sig must be of length 1 or length(y)")}
+  if (length(xi) != length(y) & length(xi) != 1) {stop("xi must be of length 1 or length(y)")}
+  
   std_exp <- (1 / xi) * log( 1 + xi * (y  /sig))  
   return(std_exp)
 }
 
-
-#Get parameter estimates and delta confidence intervals
+#' Obtain MLEs, SEs and CIs for standard GPD parameters
+#'
+#' @author Conor Murphy
+#'
+#' @param mags A numeric vector of magnitudes.
+#' @param threshold A numeric value of the threshold.
+#' @param show_fit Logical. If TRUE, the full fit object is returned.
+#'
+#' @returns A list with MLEs, SEs and CIs for the scale and shape parameters.
 get_par_ests <- function(mags, threshold, show_fit = TRUE){
   excesses <- mags[mags > threshold] - threshold
   mle0 <- mean(excesses)
@@ -362,7 +381,59 @@ get_par_ests <- function(mags, threshold, show_fit = TRUE){
   return(output)
 }
 
+#' GPD log-likelihood with covariates
+#' 
+#' @author Conor Murphy
+#' 
+#' @param par A numeric vector of parameter values of length 3.
+#' @param excess A numeric vector of excesses of some threshold.
+#' @param thresh_par A numeric vector of threshold parameter values of length 2.
+#' @param V A numeric vector of distance values corresponding to each excess.
+#' @param ics A numeric vector of stress values corresponding to each excess.
+#' 
+#' @returns A numeric value of the log-likeihood.
+GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
+  
+  # input checks
+  stopifnot(length(par) == 3)
+  stoifnot(length(thresh_par) == 2)
+  if (!is.numeric(excess)) stop("excess must be a vector")
+  if (!is.numeric(V)) stop("V must be vector")
+  if (!is.numeric(ics)) stop("ics must be vector")
+  stopifnot(length(excess) == length(V))
+  stopifnot(length(excess) == length(ics))
+  
+  sigma_par <- par[1:2]
+  xi <- par[3]
+  
+  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
+  sigma_tilde <- sigma_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
+  sigma_check <- c(sigma_ics, sigma_tilde)
+  
+  if (any(sigma_check < 0) || xi <= -0.9 || sigma_par[2] < 0) {return(-1e7)}
+  
+  if (abs(xi) < 1e-10) {return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))}
+  
+  if (any(1 + (xi * excess) / sigma_tilde <= 0)) {return(-1e6)}
+  
+  LL1 <- -sum(log(sigma_tilde))
+  LL2 <- -(1 + 1 / xi) * (sum(log(1 + (xi * excess) / sigma_tilde)))
+  return(LL1 + LL2)
+  
+}
 
+#' Obtain MLEs, SEs and CIs for parameters from a GPD with covariates
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param thresh_fit A list containing the threshold parameters.
+#' @param V A numeric vector of distance values corresponding to each magnitude.
+#' @param ics A numeric vector of stress values corresponding to each magnitude.
+#' @param show_fit Logical. If TRUE, the full fit object is returned.
+#' 
+#' @returns A list with MLEs, SEs and CIs for the parameters of the 
+#' covariate dependent GPD model.
 get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, show_fit = TRUE){
   
   threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
@@ -404,10 +475,21 @@ get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, show_fit = TRUE){
   return(output)
 }
 
-
-get_qq_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6), SEED=11111){
-  
-  set.seed(SEED)
+#' Generate Q-Q plot on Exponential margins for GPD with covariates
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param thresh_fit A list containing the threshold parameters.
+#' @param V A numeric vector of distance values corresponding to each magnitude.
+#' @param ics A numeric vector of stress values corresponding to each magnitude.
+#' @param n_boot Number of bootstrap samples to use for tolerance intervals.
+#' @param main Title for the plot.
+#' @param xlim x-axis limits for the plot.
+#' @param ylim y-axis limits for the plot.
+#' 
+#' @returns A Q-Q plot with 95% tolerance intervals.
+get_qq_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6)){
   
   threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2] * V
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
@@ -446,9 +528,19 @@ get_qq_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "
 }
 
 
-get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6), SEED= 11111){
-  
-  set.seed(SEED)
+#' Generate Q-Q plot on Exponential margins for standard GPD
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param threshold A numeric value of the threshold.
+#' @param n_boot Number of bootstrap samples to use for tolerance intervals.
+#' @param main Title for the plot.
+#' @param xlim x-axis limits for the plot.
+#' @param ylim y-axis limits for the plot.
+#' 
+#' @returns A Q-Q plot with 95% tolerance intervals.
+get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6)){
   
   excesses <- mags[mags > threshold] - threshold
   par_ests <- get_par_ests(mags = mags, threshold = threshold)$par
@@ -481,9 +573,19 @@ get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot", 
   lines(model_quantiles, lower, col = "red", lwd = 2, lty = "dashed")
 }
 
-get_pp_plot_const <- function(mags, threshold, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1), SEED=11111){
-  
-  set.seed(SEED)
+#' Generate P-P plot for standard GPD model
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param threshold A numeric value of the threshold.
+#' @param n_boot Number of bootstrap samples to use for tolerance intervals.
+#' @param main Title for the plot.
+#' @param xlim x-axis limits for the plot.
+#' @param ylim y-axis limits for the plot.
+#' 
+#' @returns A P-P plot with 95% tolerance intervals.
+get_pp_plot_const <- function(mags, threshold, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1)){
   
   excesses <- mags[mags > threshold] - threshold
   par_ests <- get_par_ests(mags = mags, threshold = threshold)$par
@@ -515,10 +617,22 @@ get_pp_plot_const <- function(mags, threshold, n_boot = 200, main = "P-P plot", 
   lines(sample_probs, lower, col = "red", lwd = 2)
 }
 
-get_pp_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1), SEED=11111){
-  
-  set.seed(SEED)
-  
+#' Generate P-P plot for GPD with covariates
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param thresh_fit A list containing the threshold parameters.
+#' @param V A numeric vector of distance values corresponding to each magnitude.
+#' @param ics A numeric vector of stress values corresponding to each magnitude.
+#' @param n_boot Number of bootstrap samples to use for tolerance intervals.
+#' @param main Title for the plot.
+#' @param xlim x-axis limits for the plot.
+#' @param ylim y-axis limits for the plot.
+#' 
+#' @returns A P-P plot with 95% tolerance intervals.
+get_pp_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1)){
+
   threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
   excesses <- mags[mags > threshold] - threshold[mags > threshold]
   ics_excess <- ics[mags > threshold]
@@ -556,33 +670,3 @@ get_pp_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "
   lines(sample_probs, lower, col = "red", lwd = 2)
 }
 
-
-GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
-  
-  # input checks
-  stopifnot(length(par) == 3)
-  stoifnot(length(thresh_par) == 2)
-  if (!is.numeric(excess)) stop("excess must be a vector")
-  if (!is.numeric(V)) stop("V must be vector")
-  if (!is.numeric(ics)) stop("ics must be vector")
-  stopifnot(length(excess) == length(V))
-  stopifnot(length(excess) == length(ics))
-  
-  sigma_par <- par[1:2]
-  xi <- par[3]
-  
-  sigma_ics <- sigma_par[1] + sigma_par[2]*ics
-  sigma_tilde <- sigma_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
-  sigma_check <- c(sigma_ics, sigma_tilde)
-  
-  if (any(sigma_check < 0) || xi <= -0.9 || sigma_par[2] < 0) {return(-1e7)}
-  
-  if (abs(xi) < 1e-10) {return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))}
-  
-  if (any(1 + (xi * excess) / sigma_tilde <= 0)) {return(-1e6)}
-  
-  LL1 <- -sum(log(sigma_tilde))
-  LL2 <- -(1 + 1 / xi) * (sum(log(1 + (xi * excess) / sigma_tilde)))
-  return(LL1 + LL2)
-  
-}
