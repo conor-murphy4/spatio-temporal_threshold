@@ -295,48 +295,6 @@ rgpd <- function(n, shape, scale = NULL, nu = NULL, mu = 0){
   return(sample)
 }
 
-#rgpd_rd <- function(n, sig, xi, mu, to_nearest, mu_latent = NULL){
-#  if(is.null(mu_latent)) mu_latent = mu - 0.5 * to_nearest
-#  x <- rgpd(n = n, shape = xi, scale = sig, mu = mu_latent)
-#  x <- round_to_nearest(x, to_nearest)
-#  return(x)
-#}
-
-#' evalue probability mass function of rounded generalised Pareto distribution
-#'
-#' @author Zak Varty
-#'
-#' @param x Vector values at which to evaluate mass function
-#' @param u Vector of latent threshold values
-#' @param sig_u Vector of latent scale parameters (for exceedances of u)
-#' @param xi Latent shape parameter
-#' @param to_nearest Level of rounding
-#'
-#' @return pmf evaluated at x. NOTE: does not check validity of x values.
-#'
-#' @examples
-#' dgpd_rd(x = seq(0.1, 1.5, by = 0.1), to_nearest = 0.1, u = 0, sig_u = 1, xi = 0)
-#' dgpd_rd(x = seq(0.1, 1.5, by = 0.1), to_nearest = 0.1, u = seq(0, 1.4, by = 0.1), sig_u = 1, xi = 0)
-#' # CAUTION:
-#' gpd_rd(x = 0.15, to_nearest = 0.1,  u = 0, sig_u = 1, xi = 0)
-dgpd_rd <- function(x, u, sig_u, xi, to_nearest){
-  
-  # If (Y_i - u_i | Y_i > u_i) ~ GPD(sig_i, xi)
-  # then Z_i  = [(Y_i - u_i)/sig_i | Y_i - u_i > 0] ~ GPD(1, xi)
-  
-  # range of z values that lead to observing x
-  x_low <- pmax(x - to_nearest/2, u)
-  z_low <- (x_low - u) / sig_u
-  z_high <- (x - u + to_nearest/2)/sig_u
-  
-  # calculate probability of z in that range
-  p_high <- pgpd(q = z_high, scale = 1, shape = xi, mu = 0)
-  p_low  <- pgpd(q = z_low,  scale = 1, shape = xi, mu = 0)
-  p <- p_high - p_low
-  
-  return(p)
-}
-
 
 #' Generalised Pareto log-likelihood
 #'
