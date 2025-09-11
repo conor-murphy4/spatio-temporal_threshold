@@ -17,6 +17,7 @@ output_paths <- list(
   fig_2 = "outputs/figures/fig_2.pdf", 
   fig_3a = "outputs/figures/fig_3a.pdf",
   fig_3b = "outputs/figures/fig_3b.pdf", 
+  fig_4 = "outputs/figures/fig_4.pdf",
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
 )
 
@@ -37,6 +38,7 @@ gron_rect <- data.frame(X = c(210000, 275000, 275000, 210000, 210000),
                         Y = c(560000, 560000, 625000, 625000, 560000))
 locations <- data.frame(Easting  = c(250000, 250000, 250000),
                         Northing = c(575000, 590000, 605000))
+
 
 # load required libraries and functions ----------------------------------------
 library(ggplot2)
@@ -244,57 +246,106 @@ dev.off()
 
 # Figure 4 ----------------------------------------------------------------
 
-# Best performing threshold (based on EQD)
-thresh_fit_A2 <- readRDS("threshold_results/geo_thresh_fit_V2.rds")
-thresh_fit_B1 <- readRDS("threshold_results/geo_thresh_fit_logV1.rds")
-thresh_fit_C2 <- readRDS("threshold_results/geo_thresh_fit_sqrtV2.rds")
+# Loasbest performing thresholds (based on EQD)
+thresh_fit_A2 <- readRDS("outputs/threshold_results/geo_thresh_fit_V2.rds")
+thresh_fit_B1 <- readRDS("outputs/threshold_results/geo_thresh_fit_logV1.rds")
+thresh_fit_C2 <- readRDS("outputs/threshold_results/geo_thresh_fit_sqrtV2.rds")
 
-# Observed thresholds
-gron_eq_cat$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * gron_eq_cat$V_2
-gron_eq_cat$threshold_B1 <- thresh_fit_B1$thresh_par[1] + thresh_fit_B1$thresh_par[2] * log(gron_eq_cat$V_1)
-gron_eq_cat$threshold_C2 <- thresh_fit_C2$thresh_par[1] + thresh_fit_C2$thresh_par[2] * sqrt(gron_eq_cat$V_2)
+# add threshold values (and differences) at each earthquake location
+gron_eq_cat <- gron_eq_cat %>% mutate(
+  Date = as.Date(Date),
+  threshold_A2 = thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V_2,
+  threshold_B1 = thresh_fit_B1$thresh_par[1] + thresh_fit_B1$thresh_par[2] * log(V_2),
+  threshold_C2 = thresh_fit_C2$thresh_par[1] + thresh_fit_C2$thresh_par[2] * sqrt(V_2),
+  threshold_PC = if_else(as.Date(Date) > "2015-12-25", true = 0.76, false = 1.15),
+  threshold_con = 1.45, 
+  diff_thr_B1 = threshold_A2 - threshold_B1, 
+  diff_thr_C2 = threshold_A2 - threshold_C2
+)
 
-# changepoint threshold
-change_index <- which(gron_eq_cat$Date == as.Date("2015-12-25"))
-pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat)-change_index))
-
-# average A2 threshold over space
+# Evaluate threshold A2 threshold for entire observation window
 covariates$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * covariates$V2
-covariates_in_gasfield <- covariates[inpolygon(covariates$Easting, covariates$Northing, gron_outline$Easting, gron_outline$Northing),]
 
-average_A2_threshold_over_field <- covariates_in_gasfield %>%
+# Add indicator of which spatio-temporal grid cells are within the field outline
+# (for efficiency, do first time point and repeat)
+cov_slice <- covariates %>% filter(MonthYear == "1995-04")
+in_field <- inpolygon(cov_slice$Easting,
+                      cov_slice$Northing,
+                      gron_outline$Easting,
+                      gron_outline$Northing)
+n_MonthYear <- length(unique(covariates$MonthYear))
+covariates$in_field <- rep(x = in_field, times = n_MonthYear)
+rm(cov_slice, n_MonthYear, in_field)
+
+
+average_A2_threshold_over_field <- covariates %>% 
+  filter(in_field) %>%
   group_by(Date) %>%
   summarise(threshold = mean(threshold_A2, na.rm = TRUE), .groups = "drop")
 
-locations <- data.frame(Easting = c(250000, 250000, 250000), Northing = c(575000, 590000, 605000))
-threshold_loc1 <- covariates$threshold_A2[covariates$Easting == locations$Easting[1] & covariates$Northing == locations$Northing[1]]
-threshold_loc2 <- covariates$threshold_A2[covariates$Easting == locations$Easting[2] & covariates$Northing == locations$Northing[2]]
-threshold_loc3 <- covariates$threshold_A2[covariates$Easting == locations$Easting[3] & covariates$Northing == locations$Northing[3]]
+thresh_A2_at_locations <- vector("list", length = nrow(locations))
+for (i in 1:3) {
+  ei <- locations$Easting[i]
+  ni <- locations$Northing[i]
+  
+  thresh_A2_at_locations[[i]] <- covariates %>% 
+    filter(Easting == ei & Northing == ni) %>% 
+    pull(threshold_A2)
+}
+rm(ei, ni)
 
+# Create figures ---
+path = output_paths$fig_4
+pdf(file = path, height = 5, width = 5)
+par(mfrow = c(1,1), bg = 'transparent')
 
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab="Event time", ylab = expression(Magnitude~(M[L])), pch=19, col="grey", cex=0.7)
-lines(as.Date(gron_eq_cat$Date), gron_eq_cat$threshold_A2, lwd=2)
-lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
-lines(as.Date(average_A2_threshold_over_field$Date[-1]), average_A2_threshold_over_field$threshold[-1], lwd=2, col="green")
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$Magnitude,
+  xlab = "Event time",
+  ylab = expression(Magnitude~(M[L])),
+  pch = 19,
+  col = "grey",
+  cex = 0.7)
+with(gron_eq_cat, lines(x = Date, y = threshold_A2, lwd = 2))
+with(gron_eq_cat, lines(x = Date, y = threshold_con, col = "red", lty = 2, lwd = 2))
+with(gron_eq_cat, lines(x = Date, y = pc_threshold, col = "blue", lwd = 2))
+with(average_A2_threshold_over_field[-1,], lines(x = as.Date(Date), y = threshold, lwd = 2, col = "green"))
 
-plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab="Event time", ylab = expression(Magnitude~(M[L])), pch=19, col="grey", cex=0.7)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc1[-1], col="purple", lwd=2)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc2[-1], col="darkgreen", lwd=2)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc3[-1], col="orange", lwd=2,)
-lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
+thresh_df <- data.frame(
+  date = as.Date(unique(covariates$Date)[-1]),
+  loc_1 = thresh_A2_at_locations[[1]][-1],
+  loc_2 = thresh_A2_at_locations[[2]][-1],
+  loc_3 = thresh_A2_at_locations[[3]][-1])
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$Magnitude,
+  xlab = "Event time",
+  ylab = expression(Magnitude~(M[L])),
+  pch = 19,
+  col = "grey",
+  cex = 0.7)
+lines(x = thresh_df$date, y = thresh_df$loc_1, lwd = 2, col = "purple")
+lines(x = thresh_df$date, y = thresh_df$loc_2, lwd = 2, col = "darkgreen")
+lines(x = thresh_df$date, y = thresh_df$loc_3, lwd = 2, col = "orange")
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$threshold_con, lty = 2, lwd = 2, col = "red")
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$threshold_PC, lwd = 2, col = "blue")
+rm(thresh_df)
 
-diff_thr_B1 <- gron_eq_cat$threshold_A2 - gron_eq_cat$threshold_B1
-diff_thr_C2 <- gron_eq_cat$threshold_A2 - gron_eq_cat$threshold_C2
-
-plot(as.Date(gron_eq_cat$Date), diff_thr_B1, xlab="Event time", ylab = "Difference in threshold", col="yellow", type='l', 
-     ylim=c(min(diff_thr_B1, diff_thr_C2), max(diff_thr_B1, diff_thr_C2)))
-lines(as.Date(gron_eq_cat$Date), diff_thr_C2, col="red")
-abline(h=0, col="black", lty=2)
-
+y_min <- min(gron_eq_cat$diff_thr_B1, gron_eq_cat$diff_thr_C2)
+y_max <- max(gron_eq_cat$diff_thr_B1, gron_eq_cat$diff_thr_C2)
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$diff_thr_B1,
+  xlab = "Event time",
+  ylab = "Difference in threshold",
+  col = "yellow",
+  type = 'l', 
+  ylim = c(y_min, y_max))
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$diff_thr_C2, col = "red")
+abline(h = 0, col = "black", lty = 2)
+rm(y_min, y_max)
+dev.off()
 
 # Figure 5 ----------------------------------------------------------------
 
