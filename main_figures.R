@@ -18,6 +18,7 @@ output_paths <- list(
   fig_3a = "outputs/figures/fig_3a.pdf",
   fig_3b = "outputs/figures/fig_3b.pdf", 
   fig_4 = "outputs/figures/fig_4.pdf",
+  fig_5 = "outputs/figures/fig_5.pdf",
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
 )
 
@@ -350,8 +351,6 @@ dev.off()
 # Figure 5 ----------------------------------------------------------------
 
 # Spatial threshold plots
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
 
 # Ensure proper date conversion
 covariates$Date <- as.Date(covariates$Date)
@@ -372,16 +371,24 @@ plot_threshold_for_date <- function(date) {
     filter(inpolygon(Xcoord, Ycoord, gron_polygon$POINT_X, gron_polygon$POINT_Y))
   
   ggplot(current_covariates, aes(x = Easting, y = Northing, fill = best_threshold)) +
-    geom_tile() + fixed_plot_aspect(ratio = 1) +
+    geom_tile() + 
+    fixed_plot_aspect(ratio = 1) +
     scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
     coord_fixed() +
-    theme_classic() +
-    geom_point(data = current_geo_in_polygon, aes(x = Xcoord, y = Ycoord), size = 1, shape = 19, fill = "black") +
-    labs(fill = "Threshold", x = "Easting (m)", y = "Northing (m)") 
+    geom_point(data = current_geo_in_polygon, 
+               aes(x = Xcoord, y = Ycoord),
+               size = 1,
+               shape = 19,
+               fill = "black") +
+    labs(fill = "Threshold", x = "Easting (m)", y = "Northing (m)") + 
+    theme_classic()
 }
 
-# Generate plots
 plots <- lapply(chosen_dates, plot_threshold_for_date)
+
+path = output_paths$fig_5
+pdf(file = path, height = 5, width = 10)
+par(mfrow = c(1,1), bg = 'transparent')
 
 # Confirm that both are valid ggplot objects
 if (all(sapply(plots, inherits, "ggplot"))) {
@@ -391,6 +398,7 @@ if (all(sapply(plots, inherits, "ggplot"))) {
   stop("One or more plots are not ggplot objects.")
 }
 
+dev.off()
 
 
 # Figure 6 ----------------------------------------------------------------
