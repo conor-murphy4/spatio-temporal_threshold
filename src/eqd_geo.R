@@ -16,6 +16,7 @@ source('src/helper_functions.R')
 #' @param ics A numeric vector of the stress values for the given set of earthquakes. 
 #' @param k  A positive integer denoting the number of bootstraps.
 #' @param m A positive integer denoting the number of equally-spaced probabilities at which to evaluate quantiles.
+#' @param underlying_thresh A numeric value denoting the assumed underlying threshold (default is 0).
 #'
 #' @returns A list containing the chosen threshold, the parameters of the fitted GPD, the number of observations above the chosen thresholds and the metric values 'd' corresponding to each proposed threshold.
 

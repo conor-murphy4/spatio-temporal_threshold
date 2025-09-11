@@ -1,19 +1,27 @@
 
-# Function for estimation of intensity above 0 given geophone based threshold
+# Functions for estimation of intensity of earthquakes above a threshold
 
+#' Helper function to compute grid box length in one direction
+#' 
+#' @param direction Numeric vector with coordinates in one direction (Easting or Northing)
+#' 
+#' @return Numeric value with grid box length in that direction
 grid_box <- function(direction){
   (max(unique(direction)) - min(unique(direction))) / length(unique(direction))
 }
 
+#' Function for estimation of intensity above 0 given geophone based threshold
+#' 
+#' @param par Numeric vector with parameter values (gamma_0, gamma_1)
+#' @param data Data frame with earthquake catalog including observed locations/magnitudes/covariates
+#' @param covariates Data frame with covariates (ICS, threshold, V1-V4, etc.) across whole space and time
+#' @param threshold_obs Numeric vector with threshold values for observed exceedances
+#' @param covariates_threshold Numeric vector with threshold values at covariates grid points
+#' @param thresh_fit List with threshold selection object GPD and threshold parameters
+#' 
+#' @return Numeric value of Poisson process log-likelihood
 Poisson_process_LL_icsmax <- function(par, data, covariates, threshold_obs, covariates_threshold, thresh_fit){
-  # par: parameter vector
-  # data: gron_eq_cat including observed locations/mags/covariates
-  # covariates: ICS, threshold, V1-V4, etc. across space and time
-  # threshold_obs: threshold for observed exceedances (done outside LL so 
-  # that I can specify whether it is based on V1/2/3/4 before fitting LL)
-  # covariates_threshold: threshold value at covariates grid points
-  # thresh_fit: threshold selection object
-  
+
   # Extract parameters
   gamma_0 <- par[1]
   gamma_1 <- par[2]
@@ -50,16 +58,16 @@ Poisson_process_LL_icsmax <- function(par, data, covariates, threshold_obs, cova
   return(LL_1 + LL_2)
 }
 
-# Function for intensity estimation above the conservative or other constant threshold
-
+#' Function for intensity estimation above the conservative or other constant threshold
+#' 
+#' @param par Numeric vector with parameter values (gamma_0, gamma_1)
+#' @param data Data frame with earthquake catalog including observed locations/magnitudes/covariates
+#' @param covariates Data frame with covariates (ICS, threshold, V1-V4, etc.) across whole space and time
+#' @param threshold Numeric value of constant threshold
+#' 
+#' @return Numeric value of Poisson process log-likelihood
 Poisson_process_LL_const_thresh <- function(par, data, covariates, threshold=1.45){
-  # par: parameter vector
-  # data: gron_eq_cat including observed locations/mags/covariates
-  # covariates: ICS, threshold, V1-V4, etc. across space and time
-  # threshold_obs: threshold for observed exceedances (done outside LL so 
-  # that I can specify whether it is based on V1/2/3/4 before fitting LL)
-  # thresh_fit: threshold selection object
-  
+
   # Extract parameters
   gamma_0 <- par[1]
   gamma_1 <- par[2]
@@ -89,6 +97,14 @@ Poisson_process_LL_const_thresh <- function(par, data, covariates, threshold=1.4
   return(LL_1 + LL_2)
 }
 
+#' Function to compute resulting intensity on covariates grid
+#' 
+#' @param opt_PP List with optimization output of Poisson process intensity estimation
+#' @param covariates Data frame with covariates (ICS, threshold, V1-V4, etc.) across whole space and time
+#' @param covariates_threshold Numeric vector with threshold values at covariates grid points
+#' @param thresh_fit List with threshold selection object GPD and threshold parameters
+#' 
+#' @return Numeric vector with resulting intensity values at covariates grid points
 resulting_intensity_icsmax <- function(opt_PP, covariates, covariates_threshold, thresh_fit){
   
   intensity_0 <- covariates$dsmaxdt * exp(opt_PP$par[1] + opt_PP$par[2] * covariates$ICS_max)

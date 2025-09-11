@@ -242,14 +242,18 @@ fit_obs <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$
 
 
 thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
+set.seed(11111)
 get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
+set.seed(11111)
 get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
 
 #PPplots (in supp)
 dev.new(height=5, width=5, noRStudioGD = TRUE)
 par(mfrow=c(1,1), bg='transparent')
 
+set.seed(11111)
 get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="", n_boot=1000 )
+set.seed(11111)
 get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="", n_boot=1000 )
 
 
