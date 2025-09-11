@@ -17,6 +17,8 @@ output_paths <- list(
   fig_2 = "outputs/figures/fig_2.pdf", 
   fig_3a = "outputs/figures/fig_3a.pdf",
   fig_3b = "outputs/figures/fig_3b.pdf", 
+  fig_4 = "outputs/figures/fig_4.pdf",
+  fig_5 = "outputs/figures/fig_5.pdf",
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
 )
 
@@ -37,6 +39,7 @@ gron_rect <- data.frame(X = c(210000, 275000, 275000, 210000, 210000),
                         Y = c(560000, 560000, 625000, 625000, 560000))
 locations <- data.frame(Easting  = c(250000, 250000, 250000),
                         Northing = c(575000, 590000, 605000))
+
 
 # load required libraries and functions ----------------------------------------
 library(ggplot2)
@@ -244,63 +247,110 @@ dev.off()
 
 # Figure 4 ----------------------------------------------------------------
 
-# Best performing threshold (based on EQD)
-thresh_fit_A2 <- readRDS("threshold_results/geo_thresh_fit_V2.rds")
-thresh_fit_B1 <- readRDS("threshold_results/geo_thresh_fit_logV1.rds")
-thresh_fit_C2 <- readRDS("threshold_results/geo_thresh_fit_sqrtV2.rds")
+# Loasbest performing thresholds (based on EQD)
+thresh_fit_A2 <- readRDS("outputs/threshold_results/geo_thresh_fit_V2.rds")
+thresh_fit_B1 <- readRDS("outputs/threshold_results/geo_thresh_fit_logV1.rds")
+thresh_fit_C2 <- readRDS("outputs/threshold_results/geo_thresh_fit_sqrtV2.rds")
 
-# Observed thresholds
-gron_eq_cat$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * gron_eq_cat$V_2
-gron_eq_cat$threshold_B1 <- thresh_fit_B1$thresh_par[1] + thresh_fit_B1$thresh_par[2] * log(gron_eq_cat$V_1)
-gron_eq_cat$threshold_C2 <- thresh_fit_C2$thresh_par[1] + thresh_fit_C2$thresh_par[2] * sqrt(gron_eq_cat$V_2)
+# add threshold values (and differences) at each earthquake location
+gron_eq_cat <- gron_eq_cat %>% mutate(
+  Date = as.Date(Date),
+  threshold_A2 = thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V_2,
+  threshold_B1 = thresh_fit_B1$thresh_par[1] + thresh_fit_B1$thresh_par[2] * log(V_2),
+  threshold_C2 = thresh_fit_C2$thresh_par[1] + thresh_fit_C2$thresh_par[2] * sqrt(V_2),
+  threshold_PC = if_else(as.Date(Date) > "2015-12-25", true = 0.76, false = 1.15),
+  threshold_con = 1.45, 
+  diff_thr_B1 = threshold_A2 - threshold_B1, 
+  diff_thr_C2 = threshold_A2 - threshold_C2
+)
 
-# changepoint threshold
-change_index <- which(gron_eq_cat$Date == as.Date("2015-12-25"))
-pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat)-change_index))
-
-# average A2 threshold over space
+# Evaluate threshold A2 threshold for entire observation window
 covariates$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * covariates$V2
-covariates_in_gasfield <- covariates[inpolygon(covariates$Easting, covariates$Northing, gron_outline$Easting, gron_outline$Northing),]
 
-average_A2_threshold_over_field <- covariates_in_gasfield %>%
+# Add indicator of which spatio-temporal grid cells are within the field outline
+# (for efficiency, do first time point and repeat)
+cov_slice <- covariates %>% filter(MonthYear == "1995-04")
+in_field <- inpolygon(cov_slice$Easting,
+                      cov_slice$Northing,
+                      gron_outline$Easting,
+                      gron_outline$Northing)
+n_MonthYear <- length(unique(covariates$MonthYear))
+covariates$in_field <- rep(x = in_field, times = n_MonthYear)
+rm(cov_slice, n_MonthYear, in_field)
+
+
+average_A2_threshold_over_field <- covariates %>% 
+  filter(in_field) %>%
   group_by(Date) %>%
   summarise(threshold = mean(threshold_A2, na.rm = TRUE), .groups = "drop")
 
-locations <- data.frame(Easting = c(250000, 250000, 250000), Northing = c(575000, 590000, 605000))
-threshold_loc1 <- covariates$threshold_A2[covariates$Easting == locations$Easting[1] & covariates$Northing == locations$Northing[1]]
-threshold_loc2 <- covariates$threshold_A2[covariates$Easting == locations$Easting[2] & covariates$Northing == locations$Northing[2]]
-threshold_loc3 <- covariates$threshold_A2[covariates$Easting == locations$Easting[3] & covariates$Northing == locations$Northing[3]]
+thresh_A2_at_locations <- vector("list", length = nrow(locations))
+for (i in 1:3) {
+  ei <- locations$Easting[i]
+  ni <- locations$Northing[i]
+  
+  thresh_A2_at_locations[[i]] <- covariates %>% 
+    filter(Easting == ei & Northing == ni) %>% 
+    pull(threshold_A2)
+}
+rm(ei, ni)
 
+# Create figures ---
+path = output_paths$fig_4
+pdf(file = path, height = 5, width = 5)
+par(mfrow = c(1,1), bg = 'transparent')
 
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab="Event time", ylab = expression(Magnitude~(M[L])), pch=19, col="grey", cex=0.7)
-lines(as.Date(gron_eq_cat$Date), gron_eq_cat$threshold_A2, lwd=2)
-lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
-lines(as.Date(average_A2_threshold_over_field$Date[-1]), average_A2_threshold_over_field$threshold[-1], lwd=2, col="green")
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$Magnitude,
+  xlab = "Event time",
+  ylab = expression(Magnitude~(M[L])),
+  pch = 19,
+  col = "grey",
+  cex = 0.7)
+with(gron_eq_cat, lines(x = Date, y = threshold_A2, lwd = 2))
+with(gron_eq_cat, lines(x = Date, y = threshold_con, col = "red", lty = 2, lwd = 2))
+with(gron_eq_cat, lines(x = Date, y = pc_threshold, col = "blue", lwd = 2))
+with(average_A2_threshold_over_field[-1,], lines(x = as.Date(Date), y = threshold, lwd = 2, col = "green"))
 
-plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab="Event time", ylab = expression(Magnitude~(M[L])), pch=19, col="grey", cex=0.7)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc1[-1], col="purple", lwd=2)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc2[-1], col="darkgreen", lwd=2)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc3[-1], col="orange", lwd=2,)
-lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
+thresh_df <- data.frame(
+  date = as.Date(unique(covariates$Date)[-1]),
+  loc_1 = thresh_A2_at_locations[[1]][-1],
+  loc_2 = thresh_A2_at_locations[[2]][-1],
+  loc_3 = thresh_A2_at_locations[[3]][-1])
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$Magnitude,
+  xlab = "Event time",
+  ylab = expression(Magnitude~(M[L])),
+  pch = 19,
+  col = "grey",
+  cex = 0.7)
+lines(x = thresh_df$date, y = thresh_df$loc_1, lwd = 2, col = "purple")
+lines(x = thresh_df$date, y = thresh_df$loc_2, lwd = 2, col = "darkgreen")
+lines(x = thresh_df$date, y = thresh_df$loc_3, lwd = 2, col = "orange")
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$threshold_con, lty = 2, lwd = 2, col = "red")
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$threshold_PC, lwd = 2, col = "blue")
+rm(thresh_df)
 
-diff_thr_B1 <- gron_eq_cat$threshold_A2 - gron_eq_cat$threshold_B1
-diff_thr_C2 <- gron_eq_cat$threshold_A2 - gron_eq_cat$threshold_C2
-
-plot(as.Date(gron_eq_cat$Date), diff_thr_B1, xlab="Event time", ylab = "Difference in threshold", col="yellow", type='l', 
-     ylim=c(min(diff_thr_B1, diff_thr_C2), max(diff_thr_B1, diff_thr_C2)))
-lines(as.Date(gron_eq_cat$Date), diff_thr_C2, col="red")
-abline(h=0, col="black", lty=2)
-
+y_min <- min(gron_eq_cat$diff_thr_B1, gron_eq_cat$diff_thr_C2)
+y_max <- max(gron_eq_cat$diff_thr_B1, gron_eq_cat$diff_thr_C2)
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$diff_thr_B1,
+  xlab = "Event time",
+  ylab = "Difference in threshold",
+  col = "yellow",
+  type = 'l', 
+  ylim = c(y_min, y_max))
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$diff_thr_C2, col = "red")
+abline(h = 0, col = "black", lty = 2)
+rm(y_min, y_max)
+dev.off()
 
 # Figure 5 ----------------------------------------------------------------
 
 # Spatial threshold plots
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
 
 # Ensure proper date conversion
 covariates$Date <- as.Date(covariates$Date)
@@ -321,16 +371,24 @@ plot_threshold_for_date <- function(date) {
     filter(inpolygon(Xcoord, Ycoord, gron_polygon$POINT_X, gron_polygon$POINT_Y))
   
   ggplot(current_covariates, aes(x = Easting, y = Northing, fill = best_threshold)) +
-    geom_tile() + fixed_plot_aspect(ratio = 1) +
+    geom_tile() + 
+    fixed_plot_aspect(ratio = 1) +
     scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
     coord_fixed() +
-    theme_classic() +
-    geom_point(data = current_geo_in_polygon, aes(x = Xcoord, y = Ycoord), size = 1, shape = 19, fill = "black") +
-    labs(fill = "Threshold", x = "Easting (m)", y = "Northing (m)") 
+    geom_point(data = current_geo_in_polygon, 
+               aes(x = Xcoord, y = Ycoord),
+               size = 1,
+               shape = 19,
+               fill = "black") +
+    labs(fill = "Threshold", x = "Easting (m)", y = "Northing (m)") + 
+    theme_classic()
 }
 
-# Generate plots
 plots <- lapply(chosen_dates, plot_threshold_for_date)
+
+path = output_paths$fig_5
+pdf(file = path, height = 5, width = 10)
+par(mfrow = c(1,1), bg = 'transparent')
 
 # Confirm that both are valid ggplot objects
 if (all(sapply(plots, inherits, "ggplot"))) {
@@ -340,61 +398,84 @@ if (all(sapply(plots, inherits, "ggplot"))) {
   stop("One or more plots are not ggplot objects.")
 }
 
+dev.off()
 
 
 # Figure 6 ----------------------------------------------------------------
 
 #QQplots
-dev.new(height=5, width=5, noRStudioGD = TRUE)
+
 par(mfrow=c(1,1), bg='transparent')
 
 threshold <- 1.45
+excess_data <- filter(gron_eq_cat, Magnitude > threshold)
 
-excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
-
-fit_obs <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
-                 thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
-                 control = list(fnscale = -1))
-
+fit_obs <- optim(
+  fn = GPD_LL_given_V_ICS,
+  par = c(0.1, 0, 0.1),
+  excess = excess_data$Magnitude - threshold,
+  thresh_par = c(1.45, 0),
+  V = excess_data$V_1,
+  ics = excess_data$ICS_max,
+  control = list(fnscale = -1))
 
 thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
-get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
-get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
 
-#PPplots (in supp)
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
+# QQ plots (for main text)
+pdf(file = output_paths$fig_6a, height = 5, width = 5)
+par(mfrow = c(1,1), bg = 'transparent')
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main = "")
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main = "")
+dev.off()
 
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="", n_boot=1000 )
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="", n_boot=1000 )
+# PP plots (for supplementary materials)
+pdf(file = output_paths$fig_6b, height = 5, width = 5)
+par(mfrow = c(1,1), bg = 'transparent')
+get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main = "", n_boot = 1000)
+get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main = "", n_boot = 1000)
+dev.off()
 
 
 
 # Poisson process intensity fit -------------------------------------------
 
-gron_eq_cat_exceed_A2 <- gron_eq_cat[gron_eq_cat$Magnitude > gron_eq_cat$threshold_A2,] 
+gron_eq_cat_exceed_A2 <- filter(gron_eq_cat, Magnitude > threshold_A2)
+
 #Checking how many events are removed by dsmaxdt condition
 sum(gron_eq_cat_exceed_A2$dsmaxdt == 0)
 
+cat("Fitting Poissson process model to excesses of threshold A2 ... \n")
+opt_PP_LL_icsmax <- optim(
+  fn = Poisson_process_LL_icsmax,
+  par = c(0.1, 0),
+  data = gron_eq_cat,
+  covariates = covariates,
+  threshold_obs = gron_eq_cat$threshold_A2,
+  covariates_threshold = covariates$best_threshold,
+  thresh_fit = thresh_fit_A2, 
+  control = list(fnscale = -1),
+  hessian = TRUE)
+cat("Done.")
+se <- sqrt(diag(solve(-opt_PP_LL_icsmax$hessian)))
+CIs <- cbind(opt_PP_LL_icsmax$par - qnorm(0.975) * se, opt_PP_LL_icsmax$par + qnorm(0.975) * se)
 
-(opt_PP_LL_icsmax <- optim(Poisson_process_LL_icsmax, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates, 
-                           threshold_obs = gron_eq_cat$threshold_A2, covariates_threshold = covariates$best_threshold , 
-                           thresh_fit = thresh_fit_A2, control=list(fnscale=-1), hessian=T))
-
-(se <- sqrt(diag(solve(-opt_PP_LL_icsmax$hessian))))
-(CIs <- cbind(opt_PP_LL_icsmax$par - qnorm(0.975) * se, opt_PP_LL_icsmax$par + qnorm(0.975) * se))
-
-# Corresponding par ests if using the intensity above conservative threshold
-# as in Bourne 2018
-#Checking how many events are removed by dsmaxdt condition
-gron_eq_cat_exceed_1.45 <- gron_eq_cat[gron_eq_cat$Magnitude > 1.45,]
+# Corresponding par ests if using the intensity above conservative threshold,
+# as in Bourne 2018, and check how many events are removed by dsmaxdt condition
+gron_eq_cat_exceed_1.45 <- filter(gron_eq_cat, Magnitude > 1.45)
 sum(gron_eq_cat_exceed_1.45$dsmaxdt == 0)
 
-(opt_PP_LL_icsmax_conserv <- optim(Poisson_process_LL_const_thresh, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates, 
-                                   threshold = 1.45, control=list(fnscale=-1), hessian=T))
-
-(se <- sqrt(diag(solve(-opt_PP_LL_icsmax_conserv$hessian))))
-(CIs <- cbind(opt_PP_LL_icsmax_conserv$par - qnorm(0.975) * se, opt_PP_LL_icsmax_conserv$par + qnorm(0.975) * se))
+cat("Fitting Poissson process model to excesses of 1.45 M_L ... \n")
+opt_PP_LL_icsmax_conserv <- optim(
+  fn = Poisson_process_LL_const_thresh,
+  par = c(0.1, 0),
+  data = gron_eq_cat,
+  covariates = covariates, 
+  threshold = 1.45,
+  control = list(fnscale = -1),
+  hessian = TRUE)
+cat("Done.")
+se <- sqrt(diag(solve(-opt_PP_LL_icsmax_conserv$hessian)))
+CIs <- cbind(opt_PP_LL_icsmax_conserv$par - qnorm(0.975) * se, opt_PP_LL_icsmax_conserv$par + qnorm(0.975) * se)
 
 
 # Resulting intensities

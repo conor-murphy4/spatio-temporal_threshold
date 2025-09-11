@@ -396,7 +396,7 @@ GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
   
   # input checks
   stopifnot(length(par) == 3)
-  stoifnot(length(thresh_par) == 2)
+  stopifnot(length(thresh_par) == 2)
   if (!is.numeric(excess)) stop("excess must be a vector")
   if (!is.numeric(V)) stop("V must be vector")
   if (!is.numeric(ics)) stop("ics must be vector")
