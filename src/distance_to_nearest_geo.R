@@ -1,5 +1,10 @@
 
-# Calculate 3-dimensional Euclidean distance between earthquakes and geophones
+#' Calculate 2-dimensional Euclidean distance between earthquakes and geophones
+#' 
+#' @param eq_locations Data frame with 2 columns for earthquake locations
+#' @param geo_coords Data frame with 2 columns for geophone locations
+#' 
+#' @return Numeric vector with distances in km between earthquakes and geophones
 euclid_dist <- function(eq_locations, geo_coords){
   
   euclid_km_2d <- function(x,z){
@@ -10,7 +15,12 @@ euclid_dist <- function(eq_locations, geo_coords){
   return(dist)
 }
 
-# Calculate 3-dimensional Euclidean distance between earthquakes and geophones
+#' Calculate 3-dimensional Euclidean distance between earthquakes and geophones
+#' 
+#' @param eq_locations Data frame with 3 columns for earthquake locations
+#' @param geo_coords Data frame with 3 columns for geophone locations
+#' 
+#' @return Numeric vector with distances in km between earthquakes and geophones
 euclid_dist_3d <- function(eq_locations, geo_coords){
   
   euclid_km_3d <- function(x,z){
@@ -22,14 +32,26 @@ euclid_dist_3d <- function(eq_locations, geo_coords){
 }
 
 
-# Helper function to provide full network of geophones at a given date
+#' Helper function to provide full network of geophones at a given date
+#' 
+#' @param geophones Data frame with geophone metadata
+#' @param date Date for which to extract active geophones
+#' 
+#' @return Data frame with metadata for geophones active on given date
 geo_current_full_output <- function(geophones, date){
   indices_current <- which(geophones$Start_date <= date & geophones$End_date >= date)
   current_geophones <- geophones[indices_current,]
   return(current_geophones)
 }
 
-# Look up location, depth, start- and end-dates for geophones active on given date
+#' Look up location, depth, start- and end-dates for geophones active 
+#' on given date
+#' 
+#' @param geophones Data frame with geophone metadata
+#' @param date Date for which to extract active geophones
+#' 
+#' @return Data frame with X, Y, Z coordinates and start- and end-dates for 
+#' geophones active on given date
 geo_current <- function(geophones, date){
   
   current_geophones <- geo_current_full_output(geophones, date)
@@ -45,8 +67,14 @@ geo_current <- function(geophones, date){
 }
 
 
-# Calculate distance to ith nearest geophone for earthquake locations in eq_cat 
-# (index defines i)
+#' Calculate distance to ith nearest geophone for earthquake locations in eq_cat 
+#' 
+#' @param eq_cat Data frame with earthquake catalog
+#' @param geophones Data frame with geophone metadata
+#' @param index Integer indicating value of i to consider for ith nearest geophone 
+#' 
+#' @return Numeric vector with distances in km to ith nearest geophone for each
+#' earthquake in eq_cat
 distance_to_nearest <- function(eq_cat, geophones, index = 3){
   
   index_distances <- numeric(nrow(eq_cat))

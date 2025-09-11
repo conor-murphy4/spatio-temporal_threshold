@@ -295,48 +295,6 @@ rgpd <- function(n, shape, scale = NULL, nu = NULL, mu = 0){
   return(sample)
 }
 
-#rgpd_rd <- function(n, sig, xi, mu, to_nearest, mu_latent = NULL){
-#  if(is.null(mu_latent)) mu_latent = mu - 0.5 * to_nearest
-#  x <- rgpd(n = n, shape = xi, scale = sig, mu = mu_latent)
-#  x <- round_to_nearest(x, to_nearest)
-#  return(x)
-#}
-
-#' evalue probability mass function of rounded generalised Pareto distribution
-#'
-#' @author Zak Varty
-#'
-#' @param x Vector values at which to evaluate mass function
-#' @param u Vector of latent threshold values
-#' @param sig_u Vector of latent scale parameters (for exceedances of u)
-#' @param xi Latent shape parameter
-#' @param to_nearest Level of rounding
-#'
-#' @return pmf evaluated at x. NOTE: does not check validity of x values.
-#'
-#' @examples
-#' dgpd_rd(x = seq(0.1, 1.5, by = 0.1), to_nearest = 0.1, u = 0, sig_u = 1, xi = 0)
-#' dgpd_rd(x = seq(0.1, 1.5, by = 0.1), to_nearest = 0.1, u = seq(0, 1.4, by = 0.1), sig_u = 1, xi = 0)
-#' # CAUTION:
-#' gpd_rd(x = 0.15, to_nearest = 0.1,  u = 0, sig_u = 1, xi = 0)
-dgpd_rd <- function(x, u, sig_u, xi, to_nearest){
-  
-  # If (Y_i - u_i | Y_i > u_i) ~ GPD(sig_i, xi)
-  # then Z_i  = [(Y_i - u_i)/sig_i | Y_i - u_i > 0] ~ GPD(1, xi)
-  
-  # range of z values that lead to observing x
-  x_low <- pmax(x - to_nearest/2, u)
-  z_low <- (x_low - u) / sig_u
-  z_high <- (x - u + to_nearest/2)/sig_u
-  
-  # calculate probability of z in that range
-  p_high <- pgpd(q = z_high, scale = 1, shape = xi, mu = 0)
-  p_low  <- pgpd(q = z_low,  scale = 1, shape = xi, mu = 0)
-  p <- p_high - p_low
-  
-  return(p)
-}
-
 
 #' Generalised Pareto log-likelihood
 #'
@@ -355,32 +313,46 @@ dgpd_rd <- function(x, u, sig_u, xi, to_nearest){
 GPD_LL <- function(par, z){
   sigma <- par[1]
   xi <- par[2]
-  if (sigma > 0) {
-    if (abs(xi) < 1e-10) {
-      return(-length(z) * log(sigma) - ((1 / sigma) * sum(z)))
-    }
-    else {
-      if (all(1 + (xi * z) / sigma > 0)) {
-        return(-(length(z) * log(sigma)) - ((1 + 1 / xi)*(sum(log(1 + (xi * z) / sigma)))))
-      }
-      else{
-        return(-1e6)
-      }
-    }
+  if (sigma < 0) {return(-1e7)}
+  
+  if (abs(xi) < 1e-10) {
+    return(-length(z) * log(sigma) - ((1 / sigma) * sum(z)))
   }
-  else{
-    return(-1e7)
-  }
+  
+  if (any(1 + (xi * z) / sigma <= 0)) {return(-1e6)}
+  
+  LL1 <- -(length(z) * log(sigma))
+  LL2 <- -((1 + 1 / xi) * (sum(log(1 + (xi * z) / sigma))))
+  return(LL1 + LL2)    
 }
 
-
+#' Transform GPD excesses to standard exponential
+#' 
+#' @author Conor Murphy
+#' 
+#' @param y A numeric vector of excesses of some threshold.
+#' @param sig A numeric value or vector of values of the scale parameter.
+#' @param xi A numeric value or vector of values of the shape parameter.
+#' 
+#' @returns A numeric vector of transformed excesses.
 transform_to_exp <- function(y, sig, xi){
+  
+  if (length(sig) != length(y) & length(sig) != 1) {stop("sig must be of length 1 or length(y)")}
+  if (length(xi) != length(y) & length(xi) != 1) {stop("xi must be of length 1 or length(y)")}
+  
   std_exp <- (1 / xi) * log( 1 + xi * (y  /sig))  
   return(std_exp)
 }
 
-
-#Get parameter estimates and delta confidence intervals
+#' Obtain MLEs, SEs and CIs for standard GPD parameters
+#'
+#' @author Conor Murphy
+#'
+#' @param mags A numeric vector of magnitudes.
+#' @param threshold A numeric value of the threshold.
+#' @param show_fit Logical. If TRUE, the full fit object is returned.
+#'
+#' @returns A list with MLEs, SEs and CIs for the scale and shape parameters.
 get_par_ests <- function(mags, threshold, show_fit = TRUE){
   excesses <- mags[mags > threshold] - threshold
   mle0 <- mean(excesses)
@@ -409,201 +381,17 @@ get_par_ests <- function(mags, threshold, show_fit = TRUE){
   return(output)
 }
 
-
-get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, show_fit = TRUE){
-  
-  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
-  excesses <- mags[mags > threshold] - threshold[mags > threshold]
-  V_excess <- V[mags > threshold]
-  ics_excess <- ics[mags > threshold]
-  
-  mle0 <- mean(excesses)
-  gpd_fit <- optim(GPD_LL_given_V_ICS,
-                   excess = excesses,
-                   par = c(mle0, 0, 0.1),
-                   control = list(fnscale = -1),
-                   thresh_par = thresh_fit$thresh_par, 
-                   V = V_excess,
-                   ics = ics_excess,
-                   hessian = TRUE)
-  
-  check <- gpd_fit$par[1] == thresh_fit$par[1] &
-           gpd_fit$par[2] == thresh_fit$par[2] &
-           gpd_fit$par[3] == thresh_fit$par[3]
-  if (!check) { print(gpd_fit$par); print("Parameter estimates don't agree") }
-  
-  hessian <- gpd_fit$hessian
-  cov_matrix <- solve(-1*hessian)
-  se <- sqrt(diag(cov_matrix))
-  z <- qnorm(0.975)
-  lower <- gpd_fit$par - z*se
-  upper <- gpd_fit$par + z*se
-  
-  output <- list(
-    par = gpd_fit$par,
-    SE = se,
-    CI_beta0 = round(c(lower[1], upper[1]), 3),
-    CI_beta1 = round(c(lower[2], upper[2]), 3), 
-    CI_shape = round(c(lower[3], upper[3]), 3))
-  
-  if (show_fit) {output$fit <- gpd_fit}
- 
-  return(output)
-}
-
-
-get_qq_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6), SEED=11111){
-  
-  set.seed(SEED)
-  
-  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2] * V
-  excesses <- mags[mags > threshold] - threshold[mags > threshold]
-  ics_excess <- ics[mags > threshold]
-  sigma_tilde <- thresh_fit$par[1] + 
-                 thresh_fit$par[2] * ics_excess + 
-                 thresh_fit$par[3] * threshold[mags > threshold]
-  
-  transformed_excess <- transform_to_exp(y = excesses,
-                                         sig = sigma_tilde,
-                                         xi = thresh_fit$par[3])
-  probs <- seq_along(excesses)/(length(excesses) + 1)
-  sample_quantiles <- quantile(transformed_excess, probs = probs)
-  model_quantiles <- qexp(probs, rate = 1)
-  
-  bootstrapped_quantiles <- matrix(NA, nrow = n_boot, ncol = length(probs))
-  for (i in 1:n_boot) {
-    excess_boot <- rexp(length(excesses), rate = 1)
-    bootstrapped_quantiles[i,] <- quantile(excess_boot, probs = probs)
-  }
-  upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
-  lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
-  plot(
-    x = model_quantiles,
-    y = sample_quantiles,
-    xlab = "Theoretical quantiles",
-    ylab = "Sample quantiles",
-    pch = 19,
-    asp = 1,
-    main = main,
-    xlim = xlim,
-    ylim = ylim)
-  abline(a = 0, b = 1, col = "grey")
-  lines(model_quantiles, upper, col = "red", lwd = 2, lty = "dashed")
-  lines(model_quantiles, lower, col = "red", lwd = 2, lty = "dashed")
-}
-
-
-get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6), SEED= 11111){
-  
-  set.seed(SEED)
-  
-  excesses <- mags[mags > threshold] - threshold
-  par_ests <- get_par_ests(mags = mags, threshold = threshold)$par
-  transformed_excess <- transform_to_exp(y = excesses, sig = par_ests[1], xi = par_ests[2])
-  
-  probs <- seq_along(excesses)/(length(excesses) + 1)
-  sample_quantiles <- quantile(transformed_excess, probs = probs)
-  model_quantiles <- qexp(probs, rate = 1)
-  
-  bootstrapped_quantiles <- matrix(NA, nrow = n_boot, ncol = length(probs))
-  for (i in 1:n_boot) {
-    excess_boot <- rexp(length(excesses), rate = 1)
-    bootstrapped_quantiles[i,] <- quantile(excess_boot, probs = probs)
-  }
-  
-  upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
-  lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
-  plot(
-    x = model_quantiles,
-    y = sample_quantiles,
-    xlab = "Theoretical quantiles",
-    ylab = "Sample quantiles",
-    pch = 19,
-    asp = 1,
-    main = main,
-    xlim = xlim,
-    ylim = ylim)
-  abline(a = 0, b = 1, col = "grey")
-  lines(model_quantiles, upper, col = "red", lwd = 2, lty = "dashed")
-  lines(model_quantiles, lower, col = "red", lwd = 2, lty = "dashed")
-}
-
-get_pp_plot_const <- function(mags, threshold, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1), SEED=11111){
-  
-  set.seed(SEED)
-  
-  excesses <- mags[mags > threshold] - threshold
-  par_ests <- get_par_ests(mags = mags, threshold = threshold)$par
-  transformed_excess <- transform_to_exp(y = excesses, sig = par_ests[1], xi = par_ests[2])
-  
-  transformed_excess_sorted <- sort(transformed_excess)
-  sample_probs <- seq_along(transformed_excess) / (length(transformed_excess) + 1)
-  model_probs <- pexp(transformed_excess_sorted, rate = 1)
-  
-  bootstrapped_probs <- matrix(NA, nrow = n_boot, ncol = length(excesses))
-  
-  for (i in 1:n_boot) {bootstrapped_probs[i,] <- sort(runif(length(excesses)))}
-  
-  upper <- apply(bootstrapped_probs, 2, quantile, prob = 0.975)
-  lower <- apply(bootstrapped_probs, 2, quantile, prob = 0.025)
-  
-  plot(
-    x = sample_probs, 
-    y = model_probs, 
-    xlab = "Sample probabilities", 
-    ylab = "Model probabilities", 
-    pch = 19,
-    asp = 1,
-    main = main,
-    xlim = xlim,
-    ylim = ylim)
-  abline(a = 0, b = 1, col = "grey")
-  lines(sample_probs, upper, col = "red", lwd = 2)
-  lines(sample_probs, lower, col = "red", lwd = 2)
-}
-
-get_pp_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1), SEED=11111){
-  
-  set.seed(SEED)
-  
-  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
-  excesses <- mags[mags > threshold] - threshold[mags > threshold]
-  ics_excess <- ics[mags > threshold]
-  sigma_tilde <- thresh_fit$par[1] + 
-                 thresh_fit$par[2] * ics_excess +
-                 thresh_fit$par[3] * threshold[mags > threshold]
-  
-  transformed_excess <- transform_to_exp(y = excesses,
-                                         sig = sigma_tilde,
-                                         xi = thresh_fit$par[3])
-  transformed_excess_sorted <- sort(transformed_excess)
-  
-  sample_probs <- seq_along(transformed_excess) / (length(transformed_excess) + 1)
-  model_probs <- pexp(transformed_excess_sorted, rate = 1)
-  
-  bootstrapped_probs <- matrix(NA, nrow = n_boot, ncol = length(excesses))
-  
-  for (i in 1:n_boot) {bootstrapped_probs[i,] <- sort(runif(length(excesses)))}
-  
-  upper <- apply(bootstrapped_probs, 2, quantile, prob = 0.975)
-  lower <- apply(bootstrapped_probs, 2, quantile, prob = 0.025)
-  
-  plot(
-    x = sample_probs, 
-    y = model_probs, 
-    xlab = "Sample probabilities", 
-    ylab = "Model probabilities", 
-    pch = 19,
-    asp = 1,
-    main = main,
-    xlim = xlim,
-    ylim = ylim)
-  abline(a = 0, b = 1, col = "grey")
-  lines(sample_probs, upper, col = "red", lwd = 2)
-  lines(sample_probs, lower, col = "red", lwd = 2)
-}
-
-
+#' GPD log-likelihood with covariates
+#' 
+#' @author Conor Murphy
+#' 
+#' @param par A numeric vector of parameter values of length 3.
+#' @param excess A numeric vector of excesses of some threshold.
+#' @param thresh_par A numeric vector of threshold parameter values of length 2.
+#' @param V A numeric vector of distance values corresponding to each excess.
+#' @param ics A numeric vector of stress values corresponding to each excess.
+#' 
+#' @returns A numeric value of the log-likeihood.
 GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
   
   # input checks
@@ -622,14 +410,263 @@ GPD_LL_given_V_ICS <- function(par, excess, thresh_par, V, ics){
   sigma_tilde <- sigma_ics + xi*(thresh_par[[1]] + thresh_par[[2]]*V)
   sigma_check <- c(sigma_ics, sigma_tilde)
   
-  if (any(sigma_check > 0) & xi > -0.9 & sigma_par[2] < 0) {return(-1e7)}
+  if (any(sigma_check < 0) || xi <= -0.9 || sigma_par[2] < 0) {return(-1e7)}
   
   if (abs(xi) < 1e-10) {return(-sum(log(sigma_tilde)) - sum(excess/sigma_tilde))}
-   
+  
   if (any(1 + (xi * excess) / sigma_tilde <= 0)) {return(-1e6)}
   
   LL1 <- -sum(log(sigma_tilde))
   LL2 <- -(1 + 1 / xi) * (sum(log(1 + (xi * excess) / sigma_tilde)))
   return(LL1 + LL2)
-      
+  
 }
+
+#' Obtain MLEs, SEs and CIs for parameters from a GPD with covariates
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param thresh_fit A list containing the threshold parameters.
+#' @param V A numeric vector of distance values corresponding to each magnitude.
+#' @param ics A numeric vector of stress values corresponding to each magnitude.
+#' @param show_fit Logical. If TRUE, the full fit object is returned.
+#' 
+#' @returns A list with MLEs, SEs and CIs for the parameters of the 
+#' covariate dependent GPD model.
+get_par_ests_geo_ics <- function(mags, thresh_fit, V, ics, show_fit = TRUE){
+  
+  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
+  excesses <- mags[mags > threshold] - threshold[mags > threshold]
+  V_excess <- V[mags > threshold]
+  ics_excess <- ics[mags > threshold]
+  
+  mle0 <- mean(excesses)
+  gpd_fit <- optim(GPD_LL_given_V_ICS,
+                   excess = excesses,
+                   par = c(mle0, 0, 0.1),
+                   control = list(fnscale = -1),
+                   thresh_par = thresh_fit$thresh_par, 
+                   V = V_excess,
+                   ics = ics_excess,
+                   hessian = TRUE)
+  
+  check <- gpd_fit$par[1] == thresh_fit$par[1] &
+    gpd_fit$par[2] == thresh_fit$par[2] &
+    gpd_fit$par[3] == thresh_fit$par[3]
+  if (!check) { print(gpd_fit$par); print("Parameter estimates don't agree") }
+  
+  hessian <- gpd_fit$hessian
+  cov_matrix <- solve(-1*hessian)
+  se <- sqrt(diag(cov_matrix))
+  z <- qnorm(0.975)
+  lower <- gpd_fit$par - z*se
+  upper <- gpd_fit$par + z*se
+  
+  output <- list(
+    par = gpd_fit$par,
+    SE = se,
+    CI_beta0 = round(c(lower[1], upper[1]), 3),
+    CI_beta1 = round(c(lower[2], upper[2]), 3), 
+    CI_shape = round(c(lower[3], upper[3]), 3))
+  
+  if (show_fit) {output$fit <- gpd_fit}
+  
+  return(output)
+}
+
+#' Generate Q-Q plot on Exponential margins for GPD with covariates
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param thresh_fit A list containing the threshold parameters.
+#' @param V A numeric vector of distance values corresponding to each magnitude.
+#' @param ics A numeric vector of stress values corresponding to each magnitude.
+#' @param n_boot Number of bootstrap samples to use for tolerance intervals.
+#' @param main Title for the plot.
+#' @param xlim x-axis limits for the plot.
+#' @param ylim y-axis limits for the plot.
+#' 
+#' @returns A Q-Q plot with 95% tolerance intervals.
+get_qq_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6)){
+  
+  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2] * V
+  excesses <- mags[mags > threshold] - threshold[mags > threshold]
+  ics_excess <- ics[mags > threshold]
+  sigma_tilde <- thresh_fit$par[1] + 
+    thresh_fit$par[2] * ics_excess + 
+    thresh_fit$par[3] * threshold[mags > threshold]
+  
+  transformed_excess <- transform_to_exp(y = excesses,
+                                         sig = sigma_tilde,
+                                         xi = thresh_fit$par[3])
+  probs <- seq_along(excesses)/(length(excesses) + 1)
+  sample_quantiles <- quantile(transformed_excess, probs = probs)
+  model_quantiles <- qexp(probs, rate = 1)
+  
+  bootstrapped_quantiles <- matrix(NA, nrow = n_boot, ncol = length(probs))
+  for (i in 1:n_boot) {
+    excess_boot <- rexp(length(excesses), rate = 1)
+    bootstrapped_quantiles[i,] <- quantile(excess_boot, probs = probs)
+  }
+  upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
+  lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
+  plot(
+    x = model_quantiles,
+    y = sample_quantiles,
+    xlab = "Theoretical quantiles",
+    ylab = "Sample quantiles",
+    pch = 19,
+    asp = 1,
+    main = main,
+    xlim = xlim,
+    ylim = ylim)
+  abline(a = 0, b = 1, col = "grey")
+  lines(model_quantiles, upper, col = "red", lwd = 2, lty = "dashed")
+  lines(model_quantiles, lower, col = "red", lwd = 2, lty = "dashed")
+}
+
+
+#' Generate Q-Q plot on Exponential margins for standard GPD
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param threshold A numeric value of the threshold.
+#' @param n_boot Number of bootstrap samples to use for tolerance intervals.
+#' @param main Title for the plot.
+#' @param xlim x-axis limits for the plot.
+#' @param ylim y-axis limits for the plot.
+#' 
+#' @returns A Q-Q plot with 95% tolerance intervals.
+get_qq_plot_const <- function(mags, threshold, n_boot = 200, main = "Q-Q plot", xlim=c(0,6), ylim=c(0,6)){
+  
+  excesses <- mags[mags > threshold] - threshold
+  par_ests <- get_par_ests(mags = mags, threshold = threshold)$par
+  transformed_excess <- transform_to_exp(y = excesses, sig = par_ests[1], xi = par_ests[2])
+  
+  probs <- seq_along(excesses)/(length(excesses) + 1)
+  sample_quantiles <- quantile(transformed_excess, probs = probs)
+  model_quantiles <- qexp(probs, rate = 1)
+  
+  bootstrapped_quantiles <- matrix(NA, nrow = n_boot, ncol = length(probs))
+  for (i in 1:n_boot) {
+    excess_boot <- rexp(length(excesses), rate = 1)
+    bootstrapped_quantiles[i,] <- quantile(excess_boot, probs = probs)
+  }
+  
+  upper <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.975)
+  lower <- apply(bootstrapped_quantiles, 2, quantile, prob = 0.025)
+  plot(
+    x = model_quantiles,
+    y = sample_quantiles,
+    xlab = "Theoretical quantiles",
+    ylab = "Sample quantiles",
+    pch = 19,
+    asp = 1,
+    main = main,
+    xlim = xlim,
+    ylim = ylim)
+  abline(a = 0, b = 1, col = "grey")
+  lines(model_quantiles, upper, col = "red", lwd = 2, lty = "dashed")
+  lines(model_quantiles, lower, col = "red", lwd = 2, lty = "dashed")
+}
+
+#' Generate P-P plot for standard GPD model
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param threshold A numeric value of the threshold.
+#' @param n_boot Number of bootstrap samples to use for tolerance intervals.
+#' @param main Title for the plot.
+#' @param xlim x-axis limits for the plot.
+#' @param ylim y-axis limits for the plot.
+#' 
+#' @returns A P-P plot with 95% tolerance intervals.
+get_pp_plot_const <- function(mags, threshold, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1)){
+  
+  excesses <- mags[mags > threshold] - threshold
+  par_ests <- get_par_ests(mags = mags, threshold = threshold)$par
+  transformed_excess <- transform_to_exp(y = excesses, sig = par_ests[1], xi = par_ests[2])
+  
+  transformed_excess_sorted <- sort(transformed_excess)
+  sample_probs <- seq_along(transformed_excess) / (length(transformed_excess) + 1)
+  model_probs <- pexp(transformed_excess_sorted, rate = 1)
+  
+  bootstrapped_probs <- matrix(NA, nrow = n_boot, ncol = length(excesses))
+  
+  for (i in 1:n_boot) {bootstrapped_probs[i,] <- sort(runif(length(excesses)))}
+  
+  upper <- apply(bootstrapped_probs, 2, quantile, prob = 0.975)
+  lower <- apply(bootstrapped_probs, 2, quantile, prob = 0.025)
+  
+  plot(
+    x = sample_probs, 
+    y = model_probs, 
+    xlab = "Sample probabilities", 
+    ylab = "Model probabilities", 
+    pch = 19,
+    asp = 1,
+    main = main,
+    xlim = xlim,
+    ylim = ylim)
+  abline(a = 0, b = 1, col = "grey")
+  lines(sample_probs, upper, col = "red", lwd = 2)
+  lines(sample_probs, lower, col = "red", lwd = 2)
+}
+
+#' Generate P-P plot for GPD with covariates
+#' 
+#' @author Conor Murphy
+#' 
+#' @param mags A numeric vector of magnitudes.
+#' @param thresh_fit A list containing the threshold parameters.
+#' @param V A numeric vector of distance values corresponding to each magnitude.
+#' @param ics A numeric vector of stress values corresponding to each magnitude.
+#' @param n_boot Number of bootstrap samples to use for tolerance intervals.
+#' @param main Title for the plot.
+#' @param xlim x-axis limits for the plot.
+#' @param ylim y-axis limits for the plot.
+#' 
+#' @returns A P-P plot with 95% tolerance intervals.
+get_pp_plot_geo_ics <- function(mags, thresh_fit, V, ics, n_boot = 200, main = "P-P plot", xlim=c(0,1), ylim=c(0,1)){
+
+  threshold <- thresh_fit$thresh_par[1] + thresh_fit$thresh_par[2]*V
+  excesses <- mags[mags > threshold] - threshold[mags > threshold]
+  ics_excess <- ics[mags > threshold]
+  sigma_tilde <- thresh_fit$par[1] + 
+    thresh_fit$par[2] * ics_excess +
+    thresh_fit$par[3] * threshold[mags > threshold]
+  
+  transformed_excess <- transform_to_exp(y = excesses,
+                                         sig = sigma_tilde,
+                                         xi = thresh_fit$par[3])
+  transformed_excess_sorted <- sort(transformed_excess)
+  
+  sample_probs <- seq_along(transformed_excess) / (length(transformed_excess) + 1)
+  model_probs <- pexp(transformed_excess_sorted, rate = 1)
+  
+  bootstrapped_probs <- matrix(NA, nrow = n_boot, ncol = length(excesses))
+  
+  for (i in 1:n_boot) {bootstrapped_probs[i,] <- sort(runif(length(excesses)))}
+  
+  upper <- apply(bootstrapped_probs, 2, quantile, prob = 0.975)
+  lower <- apply(bootstrapped_probs, 2, quantile, prob = 0.025)
+  
+  plot(
+    x = sample_probs, 
+    y = model_probs, 
+    xlab = "Sample probabilities", 
+    ylab = "Model probabilities", 
+    pch = 19,
+    asp = 1,
+    main = main,
+    xlim = xlim,
+    ylim = ylim)
+  abline(a = 0, b = 1, col = "grey")
+  lines(sample_probs, upper, col = "red", lwd = 2)
+  lines(sample_probs, lower, col = "red", lwd = 2)
+}
+
