@@ -404,56 +404,78 @@ dev.off()
 # Figure 6 ----------------------------------------------------------------
 
 #QQplots
-dev.new(height=5, width=5, noRStudioGD = TRUE)
+
 par(mfrow=c(1,1), bg='transparent')
 
 threshold <- 1.45
+excess_data <- filter(gron_eq_cat, Magnitude > threshold)
 
-excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
-
-fit_obs <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
-                 thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
-                 control = list(fnscale = -1))
-
+fit_obs <- optim(
+  fn = GPD_LL_given_V_ICS,
+  par = c(0.1, 0, 0.1),
+  excess = excess_data$Magnitude - threshold,
+  thresh_par = c(1.45, 0),
+  V = excess_data$V_1,
+  ics = excess_data$ICS_max,
+  control = list(fnscale = -1))
 
 thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
-get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
-get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
 
-#PPplots (in supp)
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
+# QQ plots (for main text)
+pdf(file = output_paths$fig_6a, height = 5, width = 5)
+par(mfrow = c(1,1), bg = 'transparent')
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main = "")
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main = "")
+dev.off()
 
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="", n_boot=1000 )
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="", n_boot=1000 )
+# PP plots (for supplementary materials)
+pdf(file = output_paths$fig_6b, height = 5, width = 5)
+par(mfrow = c(1,1), bg = 'transparent')
+get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main = "", n_boot = 1000)
+get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main = "", n_boot = 1000)
+dev.off()
 
 
 
 # Poisson process intensity fit -------------------------------------------
 
-gron_eq_cat_exceed_A2 <- gron_eq_cat[gron_eq_cat$Magnitude > gron_eq_cat$threshold_A2,] 
+gron_eq_cat_exceed_A2 <- filter(gron_eq_cat, Magnitude > threshold_A2)
+
 #Checking how many events are removed by dsmaxdt condition
 sum(gron_eq_cat_exceed_A2$dsmaxdt == 0)
 
+cat("Fitting Poissson process model to excesses of threshold A2 ... \n")
+opt_PP_LL_icsmax <- optim(
+  fn = Poisson_process_LL_icsmax,
+  par = c(0.1, 0),
+  data = gron_eq_cat,
+  covariates = covariates,
+  threshold_obs = gron_eq_cat$threshold_A2,
+  covariates_threshold = covariates$best_threshold,
+  thresh_fit = thresh_fit_A2, 
+  control = list(fnscale = -1),
+  hessian = TRUE)
+cat("Done.")
+se <- sqrt(diag(solve(-opt_PP_LL_icsmax$hessian)))
+CIs <- cbind(opt_PP_LL_icsmax$par - qnorm(0.975) * se, opt_PP_LL_icsmax$par + qnorm(0.975) * se)
 
-(opt_PP_LL_icsmax <- optim(Poisson_process_LL_icsmax, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates, 
-                           threshold_obs = gron_eq_cat$threshold_A2, covariates_threshold = covariates$best_threshold , 
-                           thresh_fit = thresh_fit_A2, control=list(fnscale=-1), hessian=T))
-
-(se <- sqrt(diag(solve(-opt_PP_LL_icsmax$hessian))))
-(CIs <- cbind(opt_PP_LL_icsmax$par - qnorm(0.975) * se, opt_PP_LL_icsmax$par + qnorm(0.975) * se))
-
-# Corresponding par ests if using the intensity above conservative threshold
-# as in Bourne 2018
-#Checking how many events are removed by dsmaxdt condition
-gron_eq_cat_exceed_1.45 <- gron_eq_cat[gron_eq_cat$Magnitude > 1.45,]
+# Corresponding par ests if using the intensity above conservative threshold,
+# as in Bourne 2018, and check how many events are removed by dsmaxdt condition
+gron_eq_cat_exceed_1.45 <- filter(gron_eq_cat, Magnitude > 1.45)
 sum(gron_eq_cat_exceed_1.45$dsmaxdt == 0)
 
-(opt_PP_LL_icsmax_conserv <- optim(Poisson_process_LL_const_thresh, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates, 
-                                   threshold = 1.45, control=list(fnscale=-1), hessian=T))
-
-(se <- sqrt(diag(solve(-opt_PP_LL_icsmax_conserv$hessian))))
-(CIs <- cbind(opt_PP_LL_icsmax_conserv$par - qnorm(0.975) * se, opt_PP_LL_icsmax_conserv$par + qnorm(0.975) * se))
+cat("Fitting Poissson process model to excesses of 1.45 M_L ... \n")
+opt_PP_LL_icsmax_conserv <- optim(
+  fn = Poisson_process_LL_const_thresh,
+  par = c(0.1, 0),
+  data = gron_eq_cat,
+  covariates = covariates, 
+  threshold = 1.45,
+  control = list(fnscale = -1),
+  hessian = TRUE)
+cat("Done.")
+se <- sqrt(diag(solve(-opt_PP_LL_icsmax_conserv$hessian)))
+CIs <- cbind(opt_PP_LL_icsmax_conserv$par - qnorm(0.975) * se, opt_PP_LL_icsmax_conserv$par + qnorm(0.975) * se)
 
 
 # Resulting intensities
