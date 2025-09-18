@@ -13,10 +13,10 @@ file_paths <- list(
 
 # TODO: CM to replace with informative names that match LaTeX source
 output_paths <- list(
-  fig_1 = "outputs/figures/fig_1.pdf",
-  fig_2 = "outputs/figures/fig_2.pdf", 
-  fig_3a = "outputs/figures/fig_3a.pdf",
-  fig_3b = "outputs/figures/fig_3b.pdf", 
+  fig_1 = "outputs/figures/fig_1_eq_cat.pdf",
+  fig_2 = "outputs/figures/fig_2_geophone_network.pdf", 
+  fig_3a = "outputs/figures/fig_3a_average_kaiser_stress_2020.pdf",
+  fig_3b = "outputs/figures/fig_3b_temporal_kaiser_stress.pdf", 
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
 )
 
