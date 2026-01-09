@@ -1,16 +1,18 @@
 # Code to reproduce figures in the main text 
 
 # Load required datasets -------------------------------------------------------
+# TODO: Should we also add file paths for threshold results here?
+# TODO: Remove unnecessry ones?
 file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
   covariates = "data/covariates/covariates_1995-2024.csv",
-  covariates_2025 = "data/covariates/covariates_1995-2055.csv",
+  covariates_full_period = "data/covariates/covariates_1995-2055.csv",
   geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
   gron_outline = "data/geophones/Groningen_Field_outline.csv",
   gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
-  covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv"
+  covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv",
+  alg3_results = "in_development/uncertainty/bootstrap_model_selection_results_Alg3.rds"
 )
-
 output_paths <- list(
   fig_1 = "outputs/figures/main/fig_1_eq_cat.pdf",
   fig_2 = "outputs/figures/main/fig_2_geophone_network.pdf", 
@@ -182,7 +184,7 @@ lines(x = dates, y = num_geophones_in_gasfield, col = "black")
 # Spatial plots of geophones active in particular years
 for (year in chosen_years) {
   is_in_year <- stringr::str_sub(geophones_deepest$Start_date, 1, 4) <= year &
-                stringr::str_sub(geophones_deepest$End_date, 1, 4) >= year
+    stringr::str_sub(geophones_deepest$End_date, 1, 4) >= year
   current_geophones <- geophones_deepest[is_in_year,]
   plot(
     x = gron_polygon$POINT_X, 
@@ -387,21 +389,19 @@ threshold <- 1.45
 
 excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
 
-fit_obs <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
-                 thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
-                 control = list(fnscale = -1))
+fit_obs_with_KS <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
+                         thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
+                         control = list(fnscale = -1))
 
+fit_obs_without_KS <- optim(GPD_LL, par = c(mean(excess_data), 0.1), z = excess_data$Magnitude - threshold, 
+                            control = list(fnscale = -1))
 
-thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
-get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
+thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
+
+get_qq_plot_const(gron_eq_cat$Magnitude, threshold, main="" )
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_with_KS, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
 get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
 
-#PPplots (in supp)
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="", n_boot=1000 )
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="", n_boot=1000 )
 
 
 
