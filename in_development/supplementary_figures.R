@@ -1,4 +1,39 @@
+# Code to reproduce figures in the main text 
 
+# Load required datasets -------------------------------------------------------
+file_paths <- list(
+  gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
+  covariates = "data/covariates/covariates_1995-2024.csv",
+  covariates_2025 = "data/covariates/covariates_1995-2055.csv",
+  geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
+  gron_outline = "data/geophones/Groningen_Field_outline.csv",
+  gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
+  covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv",
+  alg3_results = "in_development/uncertainty/bootstrap_model_selection_results_Alg3.rds"
+)
+
+# TODO: Remove unnecessary file paths and change file paths when moved out of in_development
+# TODO: Set up file same as main_figures.R and include relevant output paths
+output_paths <- list(
+  fig_1 = "outputs/figures/fig_1_eq_cat.pdf",
+  fig_2 = "outputs/figures/fig_2_geophone_network.pdf", 
+  fig_3a = "outputs/figures/fig_3a_average_kaiser_stress_2020.pdf",
+  fig_3b = "outputs/figures/fig_3b_temporal_kaiser_stress.pdf", 
+  data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
+)
+
+alg3_results <- readRDS(file_paths$alg3_results)
+
+# Table S1 -----------------------------------------------------------------
+
+
+# Proportion of models chosen
+chosen_models <- numeric(200)
+for(i in 1:200){
+  chosen_models[i] <- alg3_results[[i]]$chosen_form
+}
+table(chosen_models)
+prop.table(table(chosen_models))
 
 # Future inference (supp) --------------------------------------------------------
 (endpoint_max <- max(future_covariates$endpoint, na.rm = TRUE))
