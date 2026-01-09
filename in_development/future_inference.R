@@ -1,6 +1,6 @@
 
 source("src/distance_to_nearest_geo.R")
-source("intensity_estimation.R")
+source("src/intensity_estimation.R")
 
 library(dplyr)
 library(pracma)

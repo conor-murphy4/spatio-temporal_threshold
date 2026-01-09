@@ -11,7 +11,6 @@ file_paths <- list(
   covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv"
 )
 
-# TODO: CM to replace with informative names that match LaTeX source
 output_paths <- list(
   fig_1 = "outputs/figures/fig_1_eq_cat.pdf",
   fig_2 = "outputs/figures/fig_2_geophone_network.pdf", 
@@ -22,7 +21,6 @@ output_paths <- list(
 
 
 chosen_years <- c("2010", "2020") # in Figure 2, plot geophone networks in these years
-
 
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
 covariates <- read.csv(file_paths$covariates, header = TRUE)
@@ -57,9 +55,12 @@ source("src/intensity_estimation.R")
 change_index <- which(gron_eq_cat$Date == as.Date("2015-12-25"))
 pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat) - change_index))
 
+gron_eq_cat_before_cp <- gron_eq_cat[1:change_index, ]
+gron_eq_cat_after_cp <- gron_eq_cat[(change_index + 1):nrow(gron_eq_cat), ]
+
 path <- output_paths$fig_1
-pdf(file = path, height = 5, width = 10)
-par(mfrow = c(1, 2), bg = 'transparent')
+pdf(file = path, height = 5, width = 15)
+par(mfrow = c(1, 3), bg = 'transparent')
 plot(
   x = as.Date(gron_eq_cat$Date),
   y = gron_eq_cat$Magnitude,
@@ -79,15 +80,49 @@ lines(x = as.Date(gron_eq_cat$Date), y = pc_threshold, col = "blue", lwd = 2)
 plot( 
   x = gron_polygon$POINT_X,
   y = gron_polygon$POINT_Y,
-  col = "green",
-  xlab = "Easting (m)",
-  ylab = "Northing (m)",
+  xlab = "Easting (km)",
+  ylab = "Northing (km)",
   type = 'l',
   lty = 2,
   asp = 1,
-  lwd = 2)
-points(x = gron_eq_cat$Easting, y = gron_eq_cat$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
+  lwd = 2,
+  xaxt = "n",
+  yaxt = "n")
+points(x = gron_eq_cat_before_cp$Easting, y = gron_eq_cat_before_cp$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
 lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black", asp = 1)
+
+# adjust labels to be in km
+at_values <- axTicks(1)
+new_labels <- at_values / 1000
+axis(1, at = at_values, labels = new_labels)
+
+at_values <- axTicks(2) 
+new_labels <- at_values / 1000 
+axis(2, at = at_values, labels = new_labels)
+
+plot( 
+  x = gron_polygon$POINT_X,
+  y = gron_polygon$POINT_Y,
+  xlab = "Easting (km)",
+  ylab = "Northing (km)",
+  type = 'l',
+  lty = 2,
+  asp = 1,
+  lwd = 2,
+  xaxt = "n",
+  yaxt = "n")
+points(x = gron_eq_cat_after_cp$Easting, y = gron_eq_cat_after_cp$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
+lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black", asp = 1)
+
+# adjust labels to be in km
+at_values <- axTicks(1)
+new_labels <- at_values / 1000
+axis(1, at = at_values, labels = new_labels)
+
+at_values <- axTicks(2) 
+new_labels <- at_values / 1000 
+axis(2, at = at_values, labels = new_labels)
+
 dev.off()
 
 # Figure 2 ----------------------------------------------------------------
