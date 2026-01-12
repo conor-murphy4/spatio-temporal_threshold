@@ -139,10 +139,6 @@ dev.off()
 
 # PPplots 
 
-path <- output_paths$fig_S3
-pdf(file = path, height=5, width=15)  
-par(mfrow=c(1,3), bg='transparent')
-
 threshold <- 1.45
 excess_data <- filter(gron_eq_cat, Magnitude > threshold)
 excesses <- excess_data$Magnitude - threshold
@@ -164,8 +160,9 @@ fit_obs_with_KS <- optim(
 
 thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
 
-pdf(file = output_paths$fig_6, height = 5, width = 15)
-par(mfrow = c(1,3), bg = 'transparent')
+path <- output_paths$fig_S3
+pdf(file = path, height=5, width=15)  
+par(mfrow=c(1,3), bg='transparent')
 
 get_pp_plot_const(gron_eq_cat$Magnitude, threshold, main="" )
 get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_with_KS, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
