@@ -1,22 +1,23 @@
 # Code to reproduce figures in the main text 
 
 # Load required datasets -------------------------------------------------------
+# TODO: Should we also add file paths for threshold results here?
+# TODO: Remove unnecessry ones?
 file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
   covariates = "data/covariates/covariates_1995-2024.csv",
-  covariates_2025 = "data/covariates/covariates_1995-2055.csv",
+  covariates_full_period = "data/covariates/covariates_1995-2055.csv",
   geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
   gron_outline = "data/geophones/Groningen_Field_outline.csv",
   gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
-  covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv"
+  covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv",
+  alg3_results = "in_development/uncertainty/bootstrap_model_selection_results_Alg3.rds"
 )
-
-# TODO: CM to replace with informative names that match LaTeX source
 output_paths <- list(
-  fig_1 = "outputs/figures/fig_1.pdf",
-  fig_2 = "outputs/figures/fig_2.pdf", 
-  fig_3a = "outputs/figures/fig_3a.pdf",
-  fig_3b = "outputs/figures/fig_3b.pdf", 
+  fig_1 = "outputs/figures/main/fig_1_eq_cat.pdf",
+  fig_2 = "outputs/figures/main/fig_2_geophone_network.pdf", 
+  fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
+  fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf", 
   fig_4 = "outputs/figures/fig_4.pdf",
   fig_5 = "outputs/figures/fig_5.pdf",
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
@@ -24,7 +25,6 @@ output_paths <- list(
 
 
 chosen_years <- c("2010", "2020") # in Figure 2, plot geophone networks in these years
-
 
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
 covariates <- read.csv(file_paths$covariates, header = TRUE)
@@ -60,9 +60,12 @@ source("src/intensity_estimation.R")
 change_index <- which(gron_eq_cat$Date == as.Date("2015-12-25"))
 pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat) - change_index))
 
+gron_eq_cat_before_cp <- gron_eq_cat[1:change_index, ]
+gron_eq_cat_after_cp <- gron_eq_cat[(change_index + 1):nrow(gron_eq_cat), ]
+
 path <- output_paths$fig_1
-pdf(file = path, height = 5, width = 10)
-par(mfrow = c(1, 2), bg = 'transparent')
+pdf(file = path, height = 5, width = 15)
+par(mfrow = c(1, 3), bg = 'transparent')
 plot(
   x = as.Date(gron_eq_cat$Date),
   y = gron_eq_cat$Magnitude,
@@ -82,15 +85,49 @@ lines(x = as.Date(gron_eq_cat$Date), y = pc_threshold, col = "blue", lwd = 2)
 plot( 
   x = gron_polygon$POINT_X,
   y = gron_polygon$POINT_Y,
-  col = "green",
-  xlab = "Easting (m)",
-  ylab = "Northing (m)",
+  xlab = "Easting (km)",
+  ylab = "Northing (km)",
   type = 'l',
   lty = 2,
   asp = 1,
-  lwd = 2)
-points(x = gron_eq_cat$Easting, y = gron_eq_cat$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
+  lwd = 2,
+  xaxt = "n",
+  yaxt = "n")
+points(x = gron_eq_cat_before_cp$Easting, y = gron_eq_cat_before_cp$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
 lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black", asp = 1)
+
+# adjust labels to be in km
+at_values <- axTicks(1)
+new_labels <- at_values / 1000
+axis(1, at = at_values, labels = new_labels)
+
+at_values <- axTicks(2) 
+new_labels <- at_values / 1000 
+axis(2, at = at_values, labels = new_labels)
+
+plot( 
+  x = gron_polygon$POINT_X,
+  y = gron_polygon$POINT_Y,
+  xlab = "Easting (km)",
+  ylab = "Northing (km)",
+  type = 'l',
+  lty = 2,
+  asp = 1,
+  lwd = 2,
+  xaxt = "n",
+  yaxt = "n")
+points(x = gron_eq_cat_after_cp$Easting, y = gron_eq_cat_after_cp$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
+lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black", asp = 1)
+
+# adjust labels to be in km
+at_values <- axTicks(1)
+new_labels <- at_values / 1000
+axis(1, at = at_values, labels = new_labels)
+
+at_values <- axTicks(2) 
+new_labels <- at_values / 1000 
+axis(2, at = at_values, labels = new_labels)
+
 dev.off()
 
 # Figure 2 ----------------------------------------------------------------
@@ -150,7 +187,7 @@ lines(x = dates, y = num_geophones_in_gasfield, col = "black")
 # Spatial plots of geophones active in particular years
 for (year in chosen_years) {
   is_in_year <- stringr::str_sub(geophones_deepest$Start_date, 1, 4) <= year &
-                stringr::str_sub(geophones_deepest$End_date, 1, 4) >= year
+    stringr::str_sub(geophones_deepest$End_date, 1, 4) >= year
   current_geophones <- geophones_deepest[is_in_year,]
   plot(
     x = gron_polygon$POINT_X, 
@@ -404,36 +441,35 @@ dev.off()
 # Figure 6 ----------------------------------------------------------------
 
 #QQplots
-
-par(mfrow=c(1,1), bg='transparent')
-
 threshold <- 1.45
 excess_data <- filter(gron_eq_cat, Magnitude > threshold)
+excesses <- excess_data$Magnitude - threshold
+thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
 
-fit_obs <- optim(
+fit_obs_without_KS <- optim(
+  fn = GPD_LL, 
+  par = c(mean(excesses), 0.1), 
+  z = excesses, 
+  control = list(fnscale = -1))
+
+fit_obs_with_KS <- optim(
   fn = GPD_LL_given_V_ICS,
   par = c(0.1, 0, 0.1),
-  excess = excess_data$Magnitude - threshold,
+  excess = excesses,
   thresh_par = c(1.45, 0),
   V = excess_data$V_1,
   ics = excess_data$ICS_max,
   control = list(fnscale = -1))
 
-thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
+thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
 
-# QQ plots (for main text)
-pdf(file = output_paths$fig_6a, height = 5, width = 5)
-par(mfrow = c(1,1), bg = 'transparent')
-get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main = "")
-get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main = "")
-dev.off()
+pdf(file = output_paths$fig_6a, height = 5, width = 15)
+par(mfrow = c(1,3), bg = 'transparent')
 
-# PP plots (for supplementary materials)
-pdf(file = output_paths$fig_6b, height = 5, width = 5)
-par(mfrow = c(1,1), bg = 'transparent')
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main = "", n_boot = 1000)
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main = "", n_boot = 1000)
-dev.off()
+get_qq_plot_const(gron_eq_cat$Magnitude, threshold, main="" )
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_with_KS, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
+
 
 
 
