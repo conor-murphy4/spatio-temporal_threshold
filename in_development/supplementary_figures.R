@@ -24,7 +24,8 @@ output_paths <- list(
   fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
   fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf", 
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds",
-  fig_S2 = "outputs/figures/supp/fig_S2_sigma_0_variation.pdf"
+  fig_S2 = "outputs/figures/supp/fig_S2_sigma_0_variation.pdf",
+  fig_S3 = "outputs/figures/supp/fig_S3_ppplots.pdf"
 )
 
 chosen_times <- c("1995-04-01", "2005-01-01", "2015-01-01", "2024-01-01")
@@ -134,22 +135,43 @@ if (all(sapply(plots, inherits, "ggplot"))) {
 dev.off()
 
 
-# TODO: Fix up code similar to above
+# Figure S.3 --------------------------------------------------------------
 
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
+# PPplots 
+
+path <- output_paths$fig_S3
+pdf(file = path, height=5, width=15)  
+par(mfrow=c(1,3), bg='transparent')
 
 threshold <- 1.45
+excess_data <- filter(gron_eq_cat, Magnitude > threshold)
+excesses <- excess_data$Magnitude - threshold
 
-excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
+fit_obs_without_KS <- optim(
+  fn = GPD_LL, 
+  par = c(mean(excesses), 0.1), 
+  z = excesses, 
+  control = list(fnscale = -1))
 
-fit_obs <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
-                 thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
-                 control = list(fnscale = -1))
+fit_obs_with_KS <- optim(
+  fn = GPD_LL_given_V_ICS,
+  par = c(0.1, 0, 0.1),
+  excess = excesses,
+  thresh_par = c(1.45, 0),
+  V = excess_data$V_1,
+  ics = excess_data$ICS_max,
+  control = list(fnscale = -1))
 
+thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
 
-thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
+pdf(file = output_paths$fig_6, height = 5, width = 15)
+par(mfrow = c(1,3), bg = 'transparent')
 
+get_pp_plot_const(gron_eq_cat$Magnitude, threshold, main="" )
+get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_with_KS, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
+get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
+
+dev.off()
 get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="", n_boot=1000 )
 get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="", n_boot=1000 )
 
