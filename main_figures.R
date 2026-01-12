@@ -3,6 +3,7 @@
 # Load required datasets -------------------------------------------------------
 # TODO: Should we also add file paths for threshold results here?
 # TODO: Remove unnecessry ones?
+# TODO: Update all figure generation to be consistent (file paths, output paths, pdf(), etc.)
 file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
   covariates = "data/covariates/covariates_1995-2024.csv",
@@ -18,7 +19,8 @@ output_paths <- list(
   fig_2 = "outputs/figures/main/fig_2_geophone_network.pdf", 
   fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
   fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf", 
-  data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
+  data_3 = "Data/covariates/average_ICS_max_1995-2055.rds",
+  fig_6 = "outputs/figures/main/fig_6_qq_plots.pdf"
 )
 
 
@@ -282,9 +284,9 @@ dev.off()
 # Figure 4 ----------------------------------------------------------------
 
 # Best performing threshold (based on EQD)
-thresh_fit_A2 <- readRDS("threshold_results/geo_thresh_fit_V2.rds")
-thresh_fit_B1 <- readRDS("threshold_results/geo_thresh_fit_logV1.rds")
-thresh_fit_C2 <- readRDS("threshold_results/geo_thresh_fit_sqrtV2.rds")
+thresh_fit_A2 <- readRDS("outputs/threshold_results/geo_thresh_fit_V2.rds")
+thresh_fit_B1 <- readRDS("outputs/threshold_results/geo_thresh_fit_logV1.rds")
+thresh_fit_C2 <- readRDS("outputs/threshold_results/geo_thresh_fit_sqrtV2.rds")
 
 # Observed thresholds
 gron_eq_cat$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * gron_eq_cat$V_2
@@ -382,18 +384,20 @@ if (all(sapply(plots, inherits, "ggplot"))) {
 # Figure 6 ----------------------------------------------------------------
 
 #QQplots
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
+path <- output_paths$fig_6
+pdf(file = path, height=5, width=15)  
+par(mfrow=c(1,3), bg='transparent')
 
 threshold <- 1.45
 
 excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
+excesses <- excess_data$Magnitude - threshold
 
 fit_obs_with_KS <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
                          thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
                          control = list(fnscale = -1))
 
-fit_obs_without_KS <- optim(GPD_LL, par = c(mean(excess_data), 0.1), z = excess_data$Magnitude - threshold, 
+fit_obs_without_KS <- optim(GPD_LL, par = c(mean(excesses), 0.1), z = excess_data$Magnitude - threshold, 
                             control = list(fnscale = -1))
 
 thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
@@ -402,7 +406,7 @@ get_qq_plot_const(gron_eq_cat$Magnitude, threshold, main="" )
 get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_with_KS, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
 get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
 
-
+dev.off()
 
 
 # Poisson process intensity fit -------------------------------------------
