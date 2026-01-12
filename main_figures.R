@@ -451,17 +451,6 @@ par(mfrow=c(1,3), bg='transparent')
 threshold <- 1.45
 excess_data <- filter(gron_eq_cat, Magnitude > threshold)
 excesses <- excess_data$Magnitude - threshold
-thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
-
-excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
-excesses <- excess_data$Magnitude - threshold
-
-fit_obs_with_KS <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
-                         thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
-                         control = list(fnscale = -1))
-
-fit_obs_without_KS <- optim(GPD_LL, par = c(mean(excesses), 0.1), z = excess_data$Magnitude - threshold, 
-                            control = list(fnscale = -1))
 
 fit_obs_without_KS <- optim(
   fn = GPD_LL, 
@@ -480,7 +469,7 @@ fit_obs_with_KS <- optim(
 
 thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
 
-pdf(file = output_paths$fig_6a, height = 5, width = 15)
+pdf(file = output_paths$fig_6, height = 5, width = 15)
 par(mfrow = c(1,3), bg = 'transparent')
 
 get_qq_plot_const(gron_eq_cat$Magnitude, threshold, main="" )
