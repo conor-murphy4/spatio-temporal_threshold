@@ -24,8 +24,7 @@ output_paths <- list(
   fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
   fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf", 
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds",
-  fig_S2 = "outputs/figures/supp/fig_S2_sigma_0_variation.pdf",
-  fig_S2_one_scale = "outputs/figures/supp/fig_S2_sigma_0_variation_one_scale.pdf"
+  fig_S2 = "outputs/figures/supp/fig_S2_sigma_0_variation.pdf"
 )
 
 chosen_times <- c("1995-04-01", "2005-01-01", "2015-01-01", "2024-01-01")
@@ -80,42 +79,6 @@ thresh_fit_A2 <- readRDS("outputs/threshold_results/geo_thresh_fit_V2.rds")
 
 sig_pars <- thresh_fit_A2$par[1:2]
 
-path <- output_paths$fig_S2 
-pdf(file = path, height = 10, width = 10)
-par(mfrow = c(2,2), bg = 'transparent')
-
-for(time in chosen_times){
-  current_covariates <- filter(covariates, Date == time)
-  
-  plot_df <- current_covariates %>%
-    mutate(sig_0 = sig_pars[1] + sig_pars[2] * ICS_max)
-  
-  plot <- ggplot(
-    data = plot_df,
-    aes(x = Easting, y = Northing, fill = sig_0)) +
-    geom_tile() +
-    scale_fill_gradient(low = "red", high = "yellow") +
-    geom_point(data = gron_outline,
-               aes(x = Easting, y = Northing),
-               size = 0.5,
-               shape = 1,
-               fill = "black") +
-    coord_fixed() +
-    theme_classic() +
-    theme(plot.background = element_blank()) +
-    scale_x_continuous(
-      labels = function(x) x / 1000
-    ) +
-    scale_y_continuous(
-      labels = function(y) y / 1000
-    ) +
-    labs(x = "Easting (km)", y = "Northing (km)", fill = expression(sigma[0]))
-  
-  print(plot)      
-}
-
-# With fill limits
-
 covariates_for_chosen_times <- filter(covariates, Date %in% chosen_times)
 
 sig_0_values <- covariates_for_chosen_times %>%
@@ -124,16 +87,14 @@ sig_0_values <- covariates_for_chosen_times %>%
 
 fill_limits <- range(sig_0_values, na.rm = TRUE)
 
-path <- output_paths$fig_S2_one_scale
-pdf(file = path, height = 10, width = 10)
-par(mfrow = c(2,2), bg = 'transparent')
-for(time in chosen_times){
-  current_covariates <- filter(covariates, Date == time)
+# Function to create plot for chosen date
+plot_sigma0_for_date <- function(date) {
+  current_covariates <- filter(covariates, Date == date)
   
   plot_df <- current_covariates %>%
     mutate(sig_0 = sig_pars[1] + sig_pars[2] * ICS_max)
   
-  plot <- ggplot(
+  ggplot(
     data = plot_df,
     aes(x = Easting, y = Northing, fill = sig_0)) +
     geom_tile() +
@@ -154,48 +115,27 @@ for(time in chosen_times){
     ) +
     labs(x = "Easting (km)", y = "Northing (km)", fill = expression(sigma[0]))
   
-  print(plot)      
 }
 
+plots <- lapply(chosen_times, plot_sigma0_for_date)
 
-dev.off()
+path <- output_paths$fig_S2 
+pdf(file = path, height = 10, width = 10)
+par(mfrow = c(2,2), bg = 'transparent')
 
-# Filter data for the selected year
+# Confirm that both are valid ggplot objects
+if (all(sapply(plots, inherits, "ggplot"))) {
+  combined_plot <- wrap_plots(plots, guides = "collect") & theme(legend.position = "right")
+  print(combined_plot)
+} else {
+  stop("One or more plots are not ggplot objects.")
+}
 
-
-# Compute average ICS_max per grid cell
-
-
-# Plot
-
-#dev.new(height = 5, width = 5, noRStudioGD = TRUE)
-#par(mfrow = c(1,1), bg = 'transparent')
-path <- output_paths$fig_3a 
-pdf(file = path, height = 5, width = 5)
-ggplot(
-  data = plot_df,
-  aes(x = Easting, y = Northing, fill = Average_ICS)) +
-  geom_tile() +
-  scale_fill_gradient(low = "red", high = "yellow") +
-  geom_point(data = gron_outline,
-             aes(x = Easting, y = Northing),
-             size = 0.5,
-             shape = 1,
-             fill = "black") +
-  geom_point(data = locations,
-             aes(x = Easting, y = Northing),
-             size = 2,
-             shape = 19,
-             fill = "black") +
-  coord_fixed() +
-  theme_classic() +
-  theme(plot.background = element_blank()) +
-  labs(x = "Easting (m)", y = "Northing (m)", fill = "Average KS")
 dev.off()
 
 
 # TODO: Fix up code similar to above
-#PPplots (in supp)
+
 dev.new(height=5, width=5, noRStudioGD = TRUE)
 par(mfrow=c(1,1), bg='transparent')
 
