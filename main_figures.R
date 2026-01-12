@@ -14,19 +14,16 @@ file_paths <- list(
   covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv",
   alg3_results = "in_development/uncertainty/bootstrap_model_selection_results_Alg3.rds"
 )
+
 output_paths <- list(
   fig_1 = "outputs/figures/main/fig_1_eq_cat.pdf",
   fig_2 = "outputs/figures/main/fig_2_geophone_network.pdf", 
   fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
-  fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf", 
-<<<<<<< HEAD
-  data_3 = "Data/covariates/average_ICS_max_1995-2055.rds",
-  fig_6 = "outputs/figures/main/fig_6_qq_plots.pdf"
-=======
-  fig_4 = "outputs/figures/fig_4.pdf",
-  fig_5 = "outputs/figures/fig_5.pdf",
+  fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf",
+  fig_4 = "outputs/figures/fig_4_threshold_comparison.pdf",
+  fig_5 = "outputs/figures/fig_5_spatial_threshold.pdf",
+  fig_6 = "outputs/figures/main/fig_6_qq_plots.pdf",
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
->>>>>>> d19f393eb68584444a1bcaf83e9a4396ff44950b
 )
 
 
@@ -290,11 +287,7 @@ dev.off()
 
 # Figure 4 ----------------------------------------------------------------
 
-<<<<<<< HEAD
-# Best performing threshold (based on EQD)
-=======
-# Loasbest performing thresholds (based on EQD)
->>>>>>> d19f393eb68584444a1bcaf83e9a4396ff44950b
+# Load best performing thresholds (based on EQD)
 thresh_fit_A2 <- readRDS("outputs/threshold_results/geo_thresh_fit_V2.rds")
 thresh_fit_B1 <- readRDS("outputs/threshold_results/geo_thresh_fit_logV1.rds")
 thresh_fit_C2 <- readRDS("outputs/threshold_results/geo_thresh_fit_sqrtV2.rds")
@@ -451,19 +444,15 @@ dev.off()
 # Figure 6 ----------------------------------------------------------------
 
 #QQplots
-<<<<<<< HEAD
 path <- output_paths$fig_6
 pdf(file = path, height=5, width=15)  
 par(mfrow=c(1,3), bg='transparent')
 
-=======
->>>>>>> d19f393eb68584444a1bcaf83e9a4396ff44950b
 threshold <- 1.45
 excess_data <- filter(gron_eq_cat, Magnitude > threshold)
 excesses <- excess_data$Magnitude - threshold
 thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
 
-<<<<<<< HEAD
 excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
 excesses <- excess_data$Magnitude - threshold
 
@@ -473,7 +462,7 @@ fit_obs_with_KS <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = exce
 
 fit_obs_without_KS <- optim(GPD_LL, par = c(mean(excesses), 0.1), z = excess_data$Magnitude - threshold, 
                             control = list(fnscale = -1))
-=======
+
 fit_obs_without_KS <- optim(
   fn = GPD_LL, 
   par = c(mean(excesses), 0.1), 
@@ -488,7 +477,6 @@ fit_obs_with_KS <- optim(
   V = excess_data$V_1,
   ics = excess_data$ICS_max,
   control = list(fnscale = -1))
->>>>>>> d19f393eb68584444a1bcaf83e9a4396ff44950b
 
 thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
 
