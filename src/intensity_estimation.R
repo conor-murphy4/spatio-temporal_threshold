@@ -105,15 +105,16 @@ Poisson_process_LL_const_thresh <- function(par, data, covariates, threshold=1.4
 #' @param thresh_fit List with threshold selection object GPD and threshold parameters
 #' 
 #' @return Numeric vector with resulting intensity values at covariates grid points
-resulting_intensity_icsmax <- function(opt_PP, covariates, covariates_threshold, thresh_fit){
+resulting_intensity_icsmax <- function(intensity_par, covariates, covariates_threshold, thresh_fit_par){
   
-  intensity_0 <- covariates$dsmaxdt * exp(opt_PP$par[1] + opt_PP$par[2] * covariates$ICS_max)
+  intensity_0 <- covariates$dsmaxdt * exp(intensity_par[1] + intensity_par[2] * covariates$ICS_max)
   
-  sigma_var_0 <- thresh_fit$par[1] + thresh_fit$par[2] * covariates$ICS_max
+  sigma_var_0 <- thresh_fit_par[1] + thresh_fit_par[2] * covariates$ICS_max
   
-  intensity_above_threshold <- intensity_0 * (1 + thresh_fit$par[3] * (covariates_threshold) / sigma_var_0)^(-1 / thresh_fit$par[3])
+  intensity_above_threshold <- intensity_0 * (1 + thresh_fit_par[3] * (covariates_threshold) / sigma_var_0)^(-1 / thresh_fit_par[3])
   
-  intensity_above_threshold[1 + thresh_fit$par[3] * (covariates_threshold) / sigma_var_0 < 0] <- 0
+  intensity_above_threshold[1 + thresh_fit_par[3] * (covariates_threshold) / sigma_var_0 < 0] <- 0
+  
   return(intensity_above_threshold)
 }
 

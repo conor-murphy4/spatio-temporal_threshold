@@ -4,7 +4,7 @@
 # TODO: Should we also add file paths for threshold results here?
 file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
-  covariates = "C:/Users/murphyc4/OneDrive - Lancaster University/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2024.csv",
+  covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2024.csv",
   covariates_full_period = "data/covariates/covariates_1995-2055.csv",
   geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
   gron_outline = "data/geophones/Groningen_Field_outline.csv",
@@ -24,15 +24,15 @@ output_paths <- list(
   fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
   fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf", 
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds",
-  fig_S2 = "outputs/figures/supp/fig_S2_sigma_0_variation.pdf",
-  fig_S3 = "outputs/figures/supp/fig_S3_ppplots.pdf"
+  fig_S2 = "outputs/figures/supp/fig_S2_spatial_bootstrap_SE.pdf",
+  fig_S3 = "outputs/figures/supp/fig_S3_sigma_0_variation.pdf",
+  fig_S4 = "outputs/figures/supp/fig_S4_ppplots.pdf"
 )
 
 chosen_times <- c("1995-04-01", "2005-01-01", "2015-01-01", "2024-01-01")
 
 alg3_results <- readRDS(file_paths$alg3_results)
 
-covariates <- read.csv(file_paths$covariates, header = TRUE)
 
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
 covariates <- read.csv(file_paths$covariates, header = TRUE)
@@ -72,6 +72,134 @@ for(i in 1:200){
 table(chosen_models)
 prop.table(table(chosen_models))
 
+# Figure S.2 --------------------------------------------------------------
+
+# Spatial bootstrap SE plots from Alg 2 and 3
+
+threshold_values_uncertainty_results_Alg2 <- readRDS("in_development/uncertainty/threshold_values_uncertainty_results_Alg2.rds")
+bootstrap_model_selection_results_Alg3 <- readRDS("in_development/uncertainty/bootstrap_model_selection_results_Alg3.rds")
+thresh_fit_A2 <- readRDS("outputs/threshold_results/geo_thresh_fit_V2.rds")
+
+# Ensure proper date conversion
+covariates$Date <- as.Date(covariates$Date)
+geophones_deepest$Start_date <- as.Date(geophones_deepest$Start_date)
+geophones_deepest$End_date <- as.Date(geophones_deepest$End_date)
+chosen_dates <- as.Date(c("2010-01-01", "2020-01-01"))  
+
+covariates_for_dates <- covariates %>% filter(Date %in% chosen_dates)
+
+# Algorithm 2 -----------------------
+thresh_par_Alg2 <- do.call(rbind,lapply(threshold_values_uncertainty_results_Alg2, function(x){
+  x$thresh_par
+}))
+
+# Calculate boostrapped SE for each spatial location and date in covariates_for_dates
+
+covariates_for_dates <- covariates_for_dates %>%
+  rowwise() %>%
+  mutate(boot_SE_Alg2 = sd(thresh_par_Alg2[, 1] + thresh_par_Alg2[, 2] * V2))
+
+# Algorithm 3 -----------------------
+thresh_par_Alg3 <- do.call(rbind,lapply(bootstrap_model_selection_results_Alg3, function(x){
+  x$model_results$thresh_par
+}))
+
+chosen_models <- do.call(rbind, lapply(bootstrap_model_selection_results_Alg3, function(x){
+  x$chosen_form
+}))
+
+covariates_distances <- cbind(covariates_for_dates$V1, covariates_for_dates$V2, covariates_for_dates$V3, covariates_for_dates$V4,
+                              log(covariates_for_dates$V1), log(covariates_for_dates$V2), log(covariates_for_dates$V3), log(covariates_for_dates$V4),
+                              sqrt(covariates_for_dates$V1), sqrt(covariates_for_dates$V2), sqrt(covariates_for_dates$V3), sqrt(covariates_for_dates$V4))
+
+
+# Calculate boostrapped SE for each spatial location and date in covariates_for_dates
+dist_boot <- t(
+  covariates_distances[, chosen_models]
+)
+
+threshold_boot <- thresh_par_Alg3[, 1] +
+  thresh_par_Alg3[, 2] * dist_boot
+
+covariates_for_dates$boot_SE_Alg3 <- apply(threshold_boot, 2, sd)
+
+# Ensure fill scale range is consistent
+fill_limits <- range(covariates_for_dates$boot_SE_Alg2, 
+                     covariates_for_dates$boot_SE_Alg3, na.rm = TRUE)
+
+# Function to create plot for a given date
+plot_SE_for_date_Alg2 <- function(date) {
+  current_covariates <- covariates_for_dates %>% filter(Date == date)
+  current_geophones <- geophones_deepest %>%
+    filter(Start_date <= date, End_date >= date)
+  current_geo_in_polygon <- current_geophones %>%
+    filter(inpolygon(Xcoord, Ycoord, gron_polygon$POINT_X, gron_polygon$POINT_Y))
+  
+  ggplot(current_covariates, aes(x = Easting, y = Northing, fill = boot_SE_Alg2)) +
+    geom_tile() + 
+    fixed_plot_aspect(ratio = 1) +
+    scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
+    coord_fixed() +
+    geom_point(data = current_geo_in_polygon, 
+               aes(x = Xcoord, y = Ycoord),
+               size = 1,
+               shape = 19,
+               fill = "black") +
+    labs(fill = "Std Error", x = "Easting (km)", y = "Northing (km)") +
+    scale_x_continuous(labels = function(x) x / 1000) +
+    scale_y_continuous(labels = function(x) x / 1000) +
+    theme_classic()
+}
+
+# Function to create plot for a given date
+plot_SE_for_date_Alg3 <- function(date) {
+  current_covariates <- covariates_for_dates %>% filter(Date == date)
+  current_geophones <- geophones_deepest %>%
+    filter(Start_date <= date, End_date >= date)
+  current_geo_in_polygon <- current_geophones %>%
+    filter(inpolygon(Xcoord, Ycoord, gron_polygon$POINT_X, gron_polygon$POINT_Y))
+  
+  ggplot(current_covariates, aes(x = Easting, y = Northing, fill = boot_SE_Alg3)) +
+    geom_tile() + 
+    fixed_plot_aspect(ratio = 1) +
+    scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
+    coord_fixed() +
+    geom_point(data = current_geo_in_polygon, 
+               aes(x = Xcoord, y = Ycoord),
+               size = 1,
+               shape = 19,
+               fill = "black") +
+    labs(fill = "Std Error", x = "Easting (km)", y = "Northing (km)") +
+    scale_x_continuous(labels = function(x) x / 1000) +
+    scale_y_continuous(labels = function(x) x / 1000) +
+    theme_classic()
+}
+
+
+plots_Alg2 <- lapply(chosen_dates, plot_SE_for_date_Alg2)
+
+plots_Alg3 <- lapply(chosen_dates, plot_SE_for_date_Alg3)
+
+# Combine both lists into one
+plots <- c(plots_Alg2, plots_Alg3)
+
+
+path = output_paths$fig_S2
+pdf(file = path, height = 10, width = 10)
+par(mfrow = c(1,1), bg = 'transparent')
+
+# Confirm that both are valid ggplot objects
+if (all(sapply(plots, inherits, "ggplot"))) {
+  combined_plot <- wrap_plots(plots, guides = "collect") & theme(legend.position = "right")
+  print(combined_plot)
+} else {
+  stop("One or more plots are not ggplot objects.")
+}
+
+dev.off()
+
+
+# Figure S.3 --------------------------------------------------------------
 
 # Plots of sigma_0 for different time points ------------------------------
 
@@ -120,7 +248,7 @@ plot_sigma0_for_date <- function(date) {
 
 plots <- lapply(chosen_times, plot_sigma0_for_date)
 
-path <- output_paths$fig_S2 
+path <- output_paths$fig_S3 
 pdf(file = path, height = 10, width = 10)
 par(mfrow = c(2,2), bg = 'transparent')
 
@@ -134,8 +262,7 @@ if (all(sapply(plots, inherits, "ggplot"))) {
 
 dev.off()
 
-
-# Figure S.3 --------------------------------------------------------------
+# Figure S.4 --------------------------------------------------------------
 
 # PPplots 
 
@@ -160,7 +287,7 @@ fit_obs_with_KS <- optim(
 
 thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
 
-path <- output_paths$fig_S3
+path <- output_paths$fig_S4
 pdf(file = path, height=5, width=15)  
 par(mfrow=c(1,3), bg='transparent')
 
@@ -169,9 +296,6 @@ get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_with_KS, gron_eq_cat$V_1, 
 get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
 
 dev.off()
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="", n_boot=1000 )
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="", n_boot=1000 )
-
 
 
 # Future inference (supp) --------------------------------------------------------
