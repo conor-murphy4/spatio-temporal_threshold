@@ -7,7 +7,7 @@
 file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
   covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2024.csv",
-  covariates_full_period = "data/covariates/covariates_1995-2055.csv",
+  covariates_full_period = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2055.csv",
   geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
   gron_outline = "data/geophones/Groningen_Field_outline.csv",
   gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
@@ -23,12 +23,13 @@ output_paths <- list(
   fig_2 = "outputs/figures/main/fig_2_geophone_network.pdf", 
   fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
   fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf",
-  fig_4 = "outputs/figures/fig_4_threshold_comparison.pdf",
-  fig_5 = "outputs/figures/fig_5_spatial_threshold.pdf",
+  fig_4 = "outputs/figures/main/fig_4_threshold_comparison.pdf",
+  fig_5 = "outputs/figures/main/fig_5_spatial_threshold.pdf",
   fig_6 = "outputs/figures/main/fig_6_qq_plots.pdf",
   fig_7_Alg2 = "outputs/figures/main/fig_7_eq_occurrence_properties_Alg2.pdf",
   fig_7_Alg3 = "outputs/figures/main/fig_7_eq_occurrence_properties_Alg3.pdf",
   fig_7_Alg2_and_3 = "outputs/figures/main/fig_7_eq_occurrence_properties_Alg2_and_3.pdf",
+  fig_8 = "outputs/figures/main/fig_8_intensity_maps.pdf",
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
 )
 
@@ -37,7 +38,7 @@ chosen_years <- c("2010", "2020") # in Figure 2, plot geophone networks in these
 
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
 covariates <- read.csv(file_paths$covariates, header = TRUE)
-covariates_2055 <- read.csv(file_paths$covariates_2025, header = TRUE)
+covariates_2055 <- read.csv(file_paths$covariates_full_period, header = TRUE)
 geophones_deepest <- read.csv(file_paths$geophones_deepest, header = TRUE, row.names = 1)
 gron_outline <- read.csv(file_paths$gron_outline, header = TRUE)
 gron_polygon <- read.table(file_paths$gron_polygon, header = TRUE)
@@ -50,6 +51,8 @@ location_1 <- data.frame(Easting  = 250000, Northing = 575000)
 location_2 <- data.frame(Easting = 250000, Northing = 590000)
 location_3 <- data.frame(Easting = 250000, Northing = 605000)
 
+locations <- data.frame(Easting = c(250000, 250000, 250000), 
+                        Northing = c(575000, 590000, 605000))
 
 # load required libraries and functions ----------------------------------------
 library(ggplot2)
@@ -258,24 +261,24 @@ ggplot(
              size = 0.5,
              shape = 1,
              fill = "black") +
-  geom_point(data = location_1,
+  geom_point(data = locations[1,],
              aes(x = Easting, y = Northing),
              size = 4,
-             shape = 19,
-             fill = "blue",
-             color = "blue") +
-  geom_point(data = location_2,
+             shape = 21,
+             fill = "purple",
+             color = "black") +
+  geom_point(data = locations[2,],
              aes(x = Easting, y = Northing),
              size = 4,
-             shape = 19,
-             fill = "green",
-             color = "green") +
-  geom_point(data = location_3,
+             shape = 21,
+             fill = "darkgreen",
+             color = "black") +
+  geom_point(data = locations[3,],
              aes(x = Easting, y = Northing),
              size = 4,
-             shape = 19,
-             fill = "red",
-             color = "red") +
+             shape = 21,
+             fill = "orange",
+             color = "black") +
   coord_fixed() +
   theme_classic() +
   theme(plot.background = element_blank()) +
@@ -312,9 +315,9 @@ plot(x = average_ICS_df$Date,
      lwd = 2,
      ylim = c(0, 0.4),
      col = "black")
-lines(average_ICS_df$Date, ics_at_locations[[1]], lwd = 2, col = "blue")
-lines(average_ICS_df$Date, ics_at_locations[[2]], lwd = 2, col = "green",)
-lines(average_ICS_df$Date, ics_at_locations[[3]], lwd = 2, col = "red")
+lines(average_ICS_df$Date, ics_at_locations[[1]], lwd = 2, col = "purple")
+lines(average_ICS_df$Date, ics_at_locations[[2]], lwd = 2, col = "darkgreen",)
+lines(average_ICS_df$Date, ics_at_locations[[3]], lwd = 2, col = "orange")
 dev.off()
 
 
@@ -453,8 +456,10 @@ plot_threshold_for_date <- function(date) {
                size = 1,
                shape = 19,
                fill = "black") +
-    labs(fill = "Threshold", x = "Easting (m)", y = "Northing (m)") + 
-    theme_classic()
+    labs(fill = "Threshold", x = "Easting (km)", y = "Northing (km)") + 
+    theme_classic() +
+    scale_x_continuous(labels = function(x) x / 1000) +
+    scale_y_continuous(labels = function(y) y / 1000)
 }
 
 plots <- lapply(chosen_dates, plot_threshold_for_date)
@@ -673,11 +678,17 @@ for (i in 1:nrow(boot_intensity_fits_Alg3)) {
 saveRDS(boot_mat_A2_Alg3, file = "in_development/uncertainty/bootstrap_aggregated_intensity_A2_Alg3.rds")
 saveRDS(boot_mat_0_Alg3, file = "in_development/uncertainty/bootstrap_aggregated_intensity_0_Alg3.rds")
 
+boot_mat_A2_Alg3 <- readRDS("in_development/uncertainty/bootstrap_aggregated_intensity_A2_Alg3.rds")
+boot_mat_0_Alg3 <- readRDS("in_development/uncertainty/bootstrap_aggregated_intensity_0_Alg3.rds")
 
 agg_intensity_df$lower_CI_A2_Alg3 <- apply(boot_mat_A2_Alg3, 2, quantile, probs = 0.025)
 agg_intensity_df$upper_CI_A2_Alg3 <- apply(boot_mat_A2_Alg3, 2, quantile, probs = 0.975)
 agg_intensity_df$lower_CI_0_Alg3 <- apply(boot_mat_0_Alg3, 2, quantile, probs = 0.025)
 agg_intensity_df$upper_CI_0_Alg3 <- apply(boot_mat_0_Alg3, 2, quantile, probs = 0.975)
+
+saveRDS(agg_intensity_df, file = "in_development/uncertainty/agg_intensity_df.rds" )
+
+agg_intensity_df <- readRDS(file = "in_development/uncertainty/agg_intensity_df.rds")
 
 # Alg 2 only
 pdf(file = output_paths$fig_7_Alg2, height=5, width=5)
@@ -765,8 +776,8 @@ par(mfrow=c(1,3), bg='transparent')
 ggplot(agg_intensity_df, aes(x = Year)) +
   geom_point(aes(y = agg_intensity_A2*grid_box_area, color = "Aggregated Intensity"), size = 2) +
   geom_line(aes(y = agg_intensity_A2*grid_box_area, color = "Aggregated Intensity"), size = 1) +
-  geom_ribbon(aes(ymin = lower_CI_A2_Alg2*grid_box_area, ymax = upper_CI_A2_Alg2*grid_box_area), alpha = 0.2, fill = "blue") +
-  geom_ribbon(aes(ymin = lower_CI_A2_Alg3*grid_box_area, ymax = upper_CI_A2_Alg3*grid_box_area), alpha = 0.5, fill = "blue", colour="black", linetype="dashed") +
+  geom_ribbon(aes(ymin = lower_CI_A2_Alg2*grid_box_area, ymax = upper_CI_A2_Alg2*grid_box_area), alpha = 0, fill = "blue", colour="black", linetype="dashed") +
+  geom_ribbon(aes(ymin = lower_CI_A2_Alg3*grid_box_area, ymax = upper_CI_A2_Alg3*grid_box_area), alpha = 0.2, fill = "blue") +
   geom_point(aes(y = num_exceedances_A2 , color = "Number of Exceedances"), size = 2) +
   geom_line(aes(y = num_exceedances_A2, color = "Number of Exceedances"), size = 1) +
   labs(x = "Year", y = "Number per year") +
@@ -778,8 +789,8 @@ ggplot(agg_intensity_df, aes(x = Year)) +
 ggplot(agg_intensity_df, aes(x = Year)) +
   geom_point(aes(y = agg_intensity_0*grid_box_area, color = "Aggregated Intensity"), size = 2) +
   geom_line(aes(y = agg_intensity_0*grid_box_area, color = "Aggregated Intensity"), size = 1) +
-  geom_ribbon(aes(ymin = lower_CI_0_Alg2*grid_box_area, ymax = upper_CI_0_Alg2*grid_box_area), alpha = 0.2, fill = "blue") +
-  geom_ribbon(aes(ymin = lower_CI_0_Alg3*grid_box_area, ymax = upper_CI_0_Alg3*grid_box_area), alpha = 0.5, fill = "blue", colour="black", linetype="dashed") +
+  geom_ribbon(aes(ymin = lower_CI_0_Alg2*grid_box_area, ymax = upper_CI_0_Alg2*grid_box_area), alpha = 0, fill = "blue", colour="black", linetype="dashed") +
+  geom_ribbon(aes(ymin = lower_CI_0_Alg3*grid_box_area, ymax = upper_CI_0_Alg3*grid_box_area), alpha = 0.2, fill = "blue") +
   geom_point(aes(y = num_exceedances_0 , color = "Number of Exceedances"), size = 2) +
   geom_line(aes(y = num_exceedances_0, color = "Number of Exceedances"), size = 1) +
   labs(x = "Year", y = "Number per year") +
@@ -797,48 +808,6 @@ ggplot(agg_intensity_df, aes(x = Year)) +
   scale_color_discrete(guide="none")
 
 dev.off()
-# Aggregated intensity above 0 for all years ----------
-
-#Aggregated intensity by year
-agg_intensity_df <- covariates %>%
-  group_by(Year) %>%
-  summarise(agg_intensity = sum(intensity_above_0, na.rm = TRUE), .groups = "drop")
-
-# Remove last year
-agg_intensity_df <- agg_intensity_df[agg_intensity_df$Year != max(agg_intensity_df$Year),]
-
-# Compute number of exceedances for each year
-# NOTE: Below filters out exceedances corresponding to dsmaxdt =0 to make sure plots
-# are comparing observed values which correspond to how intensity was estimated
-
-# Convert Year to numeric for merging
-agg_intensity_df$Year <- as.numeric(as.character(agg_intensity_df$Year))
-
-# Merge the two data frames
-agg_intensity_df <- agg_intensity_df %>%
-  left_join(num_exceedances_per_year, by = "Year")
-
-# Plot agg intensity and number of exceedances against year
-ggplot(agg_intensity_df, aes(x = Year)) +
-  geom_point(aes(y = agg_intensity*grid_box_area, color = "Aggregated Intensity"), size = 2) +
-  geom_line(aes(y = agg_intensity*grid_box_area, color = "Aggregated Intensity"), size = 1) +
-  geom_point(aes(y = num_exceedances , color = "Number of Exceedances"), size = 2) +
-  geom_line(aes(y = num_exceedances, color = "Number of Exceedances"), size = 1) +
-  labs(x = "Year", y = "Number per year") +
-  theme_classic() +
-  theme(plot.background = element_blank()) +
-  scale_color_manual(values = c("blue", "red"), guide="none")
-
-# Proportion observed relative to expected (above 0)---------
-ggplot(agg_intensity_df, aes(x = Year)) +
-  geom_point(aes(y = num_exceedances/(agg_intensity*grid_box_area), color = "Proportion observed"), size = 2) +
-  geom_line(aes(y = num_exceedances/(agg_intensity*grid_box_area), color = "Proportion observed"), size = 1) +
-  labs(x = "Year", y = "Proportion observed") +
-  theme_classic() +
-  theme(plot.background = element_blank()) +
-  scale_color_discrete(guide="none")
-
-
 
 
 # Figure 8 ----------------------------------------------------------------
@@ -846,8 +815,7 @@ ggplot(agg_intensity_df, aes(x = Year)) +
 # NOTE: Below filters out exceedances corresponding to dsmaxdt = 0 to make sure plots
 # are comparing observed values which correspond to how intensity was estimated
 
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
+
 chosen_years <- c("2010", "2020")
 
 covariates_for_2010 <- covariates %>% filter(Year == "2010") %>% group_by(Easting, Northing) %>%
@@ -873,11 +841,16 @@ plot_intensity_for_year <- function(year) {
     geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
     theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
     geom_point(data = current_exceedances, aes(x = Easting, y = Northing), size=1, shape=19, fill = "black")  + 
-    labs(x = "Easting (m)", y = "Northing (m)", fill = expression(Lambda[u])) + coord_fixed() 
-}
+    labs(x = "Easting (km)", y = "Northing (km)", fill = expression(Lambda[u])) + coord_fixed() +
+    scale_x_continuous(labels = function(x) x / 1000) +
+    scale_y_continuous(labels = function(y) y / 1000)
+  }
 
 # Generate plots
 plots <- lapply(chosen_years, plot_intensity_for_year)
+
+pdf(file = output_paths$fig_8, height = 5, width = 10)
+par(mfrow = c(1,1), bg = 'transparent')
 
 # Confirm that both are valid ggplot objects
 if (all(sapply(plots, inherits, "ggplot"))) {
@@ -887,6 +860,7 @@ if (all(sapply(plots, inherits, "ggplot"))) {
   stop("One or more plots are not ggplot objects.")
 }
 
+dev.off()
 
 # Figure 9 ----------------------------------------------------------------
 

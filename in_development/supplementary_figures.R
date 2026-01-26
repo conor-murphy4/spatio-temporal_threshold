@@ -6,6 +6,7 @@ file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
   covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2024.csv",
   covariates_full_period = "data/covariates/covariates_1995-2055.csv",
+  future_covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_2024-2055.csv",
   geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
   gron_outline = "data/geophones/Groningen_Field_outline.csv",
   gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
@@ -26,7 +27,10 @@ output_paths <- list(
   data_3 = "Data/covariates/average_ICS_max_1995-2055.rds",
   fig_S2 = "outputs/figures/supp/fig_S2_spatial_bootstrap_SE.pdf",
   fig_S3 = "outputs/figures/supp/fig_S3_sigma_0_variation.pdf",
-  fig_S4 = "outputs/figures/supp/fig_S4_ppplots.pdf"
+  fig_S4 = "outputs/figures/supp/fig_S4_ppplots.pdf",
+  fig_S5 = "outputs/figures/supp/fig_S6_future_eq_properties.pdf",
+  fig_S6a = "outputs/figures/supp/fig_S6a_future_spatial_endpoint_2025.pdf",
+  fig_S6b = "outputs/figures/supp/fig_S6b_future_spatial_changes_endpoint.pdf"
 )
 
 chosen_times <- c("1995-04-01", "2005-01-01", "2015-01-01", "2024-01-01")
@@ -37,6 +41,7 @@ alg3_results <- readRDS(file_paths$alg3_results)
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
 covariates <- read.csv(file_paths$covariates, header = TRUE)
 covariates_2055 <- read.csv(file_paths$covariates_2025, header = TRUE)
+future_covariates <- read.csv(file_paths$future_covariates, header = TRUE)
 geophones_deepest <- read.csv(file_paths$geophones_deepest, header = TRUE, row.names = 1)
 gron_outline <- read.csv(file_paths$gron_outline, header = TRUE)
 gron_polygon <- read.table(file_paths$gron_polygon, header = TRUE)
@@ -298,7 +303,9 @@ get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_
 dev.off()
 
 
-# Future inference (supp) --------------------------------------------------------
+# Figure S.5 --------------------------------------------------------
+
+# Future endpoint plot over time
 (endpoint_max <- max(future_covariates$endpoint, na.rm = TRUE))
 
 endpoint_by_year <- future_covariates %>% group_by(Year) %>%
@@ -308,17 +315,38 @@ endpoint_by_year <- endpoint_by_year[-nrow(endpoint_by_year),]
 
 sum(endpoint_by_year$endpoint_wm * endpoint_by_year$agg_intensity_per_year/agg_intensity)
 
-dev.new(height=5, width=10, noRStudioGD = TRUE)
+path <- output_paths$fig_S5
+pdf(file = path, height=5, width=10)  
 par(mfrow=c(1,2), bg='transparent')
+
 plot(endpoint_by_year$Year, endpoint_by_year$agg_intensity_per_year/agg_intensity, type = "l", 
      xlab = "Year", ylab = "Ratio of integrated intensities", lwd=2, ylim=c(0,0.08))
 plot(endpoint_by_year$Year, endpoint_by_year$endpoint_wm, type = "l", 
      xlab = "Year", ylab = "Weighted mean endpoint", lwd=2)
 
 
+# Spatial Endpoint plots
+
 future_covariates_2025 <- future_covariates %>% filter(Date == "2025-01-01") 
 future_covariates_2040 <- future_covariates %>% filter(Date == "2040-01-01")
 future_covariates_2055 <- future_covariates %>% filter(Date == "2055-01-01")
+
+# Endpoint plot for 2025
+path <- output_paths$fig_S6a
+pdf(file = path, height=5, width=5)  
+par(mfrow=c(1,1), bg='transparent')
+
+ggplot(future_covariates_2025, aes(x = Easting, y = Northing, fill = endpoint)) +
+  geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
+  theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red") +
+  labs(x = "Easting (km)", y = "Northing (km)", fill = "Endpoint") + coord_fixed() +
+  scale_x_continuous(labels = function(x) x / 1000) +
+  scale_y_continuous(labels = function(y) y / 1000)
+
+
+dev.off()
+
+# Changes in endpoint between 2025-2040 and 2040-2055
 
 change_2025_2040 <- future_covariates_2040 %>%
   left_join(future_covariates_2025, by = c("Easting", "Northing"), suffix = c("_2040", "_2025")) %>%
@@ -331,27 +359,34 @@ change_2040_2055 <- future_covariates_2055 %>%
 
 fill_limits <- range(c(change_2025_2040$change_endpoint,
                        change_2040_2055$change_endpoint), na.rm = TRUE)
-plot1 <- ggplot(future_covariates_2025, aes(x = Easting, y = Northing, fill = endpoint)) +
-  geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
-  theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red") +
-  labs(x = "Easting (m)", y = "Northing (m)", fill = "Endpoint") + coord_fixed()
+
 plot2 <- ggplot(change_2025_2040, aes(x = Easting, y = Northing, fill = change_endpoint)) +
   geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
   theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-  labs(x = "Easting (m)", y = "Northing (m)", fill = "Change in Endpoint") + coord_fixed()
+  labs(x = "Easting (km)", y = "Northing (km)", fill = "Change in Endpoint") + coord_fixed() +
+  scale_x_continuous(labels = function(x) x / 1000) +
+  scale_y_continuous(labels = function(y) y / 1000)
+
 plot3 <- ggplot(change_2040_2055, aes(x = Easting, y = Northing, fill = change_endpoint)) +
   geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
   theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
-  labs(x = "Easting (m)", y = "Northing (m)", fill = "Change in Endpoint") + coord_fixed()
+  labs(x = "Easting (km)", y = "Northing (km)", fill = "Change in Endpoint") + coord_fixed() +
+  scale_x_continuous(labels = function(x) x / 1000) +
+  scale_y_continuous(labels = function(y) y / 1000)
 
 # Combine the plots using patchwork
 plots <- list(plot2, plot3)
 # Confirm that both are valid ggplot objects
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
+
+path <- output_paths$fig_S6b
+pdf(file = path, height=5, width=10)  
+par(mfrow=c(1,2), bg='transparent')
+
+
 if (all(sapply(plots, inherits, "ggplot"))) {
   combined_plot <- wrap_plots(plots, guides = "collect") & theme(legend.position = "right")
   print(combined_plot)
 } else {
   stop("One or more plots are not ggplot objects.")
 }
+dev.off()
