@@ -5,7 +5,7 @@
 file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
   covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2024.csv",
-  covariates_full_period = "data/covariates/covariates_1995-2055.csv",
+  covariates_full_period = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2055.csv",
   future_covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_2024-2055.csv",
   geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
   gron_outline = "data/geophones/Groningen_Field_outline.csv",
@@ -40,7 +40,7 @@ alg3_results <- readRDS(file_paths$alg3_results)
 
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
 covariates <- read.csv(file_paths$covariates, header = TRUE)
-covariates_2055 <- read.csv(file_paths$covariates_2025, header = TRUE)
+covariates_2055 <- read.csv(file_paths$covariates_full_period, header = TRUE)
 future_covariates <- read.csv(file_paths$future_covariates, header = TRUE)
 geophones_deepest <- read.csv(file_paths$geophones_deepest, header = TRUE, row.names = 1)
 gron_outline <- read.csv(file_paths$gron_outline, header = TRUE)
@@ -128,6 +128,21 @@ threshold_boot <- thresh_par_Alg3[, 1] +
 
 covariates_for_dates$boot_SE_Alg3 <- apply(threshold_boot, 2, sd)
 
+# Ratio of standard errors
+covariates_for_dates <- covariates_for_dates %>%
+  mutate(SE_ratio = boot_SE_Alg3 / boot_SE_Alg2)
+
+# Mean and max values for each date
+SE_summary <- covariates_for_dates %>%
+  group_by(Date) %>%
+  summarise(mean_SE_Alg2 = mean(boot_SE_Alg2, na.rm = TRUE),
+            mean_SE_Alg3 = mean(boot_SE_Alg3, na.rm = TRUE),
+            mean_SE_ratio = mean(SE_ratio, na.rm = TRUE),
+            max_SE_Alg2 = max(boot_SE_Alg2, na.rm = TRUE),
+            max_SE_Alg3 = max(boot_SE_Alg3, na.rm = TRUE),
+            max_SE_ratio = max(SE_ratio, na.rm = TRUE))
+
+SE_summary
 # Ensure fill scale range is consistent
 fill_limits <- range(covariates_for_dates$boot_SE_Alg2, 
                      covariates_for_dates$boot_SE_Alg3, na.rm = TRUE)
