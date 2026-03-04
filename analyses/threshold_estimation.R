@@ -6,7 +6,14 @@ source("src/eqd_geo.R")
 source("src/distance_to_nearest_geo.R")
 
 gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
-covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
+covariates <- do.call(
+  rbind,
+  lapply(1995:2024, function(y) {
+    read.csv(paste0("data/covariates/covariates_by_year/covariates_", y, ".csv"), header = TRUE)
+  })
+)
+covariates <- covariates %>% filter(MonthYear <= "2024-01")
+
 geophones_deepest <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_deepest_only.csv")
 
 mags <- gron_eq_cat$Magnitude

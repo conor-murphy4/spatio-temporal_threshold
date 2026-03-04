@@ -1,13 +1,49 @@
+# Code to reproduce figures in the main text 
 
-gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
-covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
-covariates_2055 <- read.csv("Data/covariates/covariates_1995-2055.csv", header=T)
-geophones_deepest <- read.csv("Data/Geophones/Geophones_processed_03-07-2024_deepest_only.csv", header=T, row.names=1)
-gron_outline <- read.csv('Data/Geophones/Groningen_Field_outline.csv', header=T)
-gron_polygon <- read.table('Data/Geophones/polygon_for_groningen_earthquakes.txt', header=T)
-gron_rect <- data.frame(X=c(210000,275000, 275000, 210000, 210000), Y=c(560000, 560000, 625000, 625000, 560000))
-covariates_in_G <- read.csv("Data/covariates/covariates_in_gasfield_1995-2024.csv", header=T)
+# Load required datasets -------------------------------------------------------
+file_paths <- list(
+  gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
+  covariates = "data/covariates/covariates_by_year/covariates_",
+  geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
+  gron_outline = "data/geophones/Groningen_Field_outline.csv",
+  gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
+  alg2_intensity = "in_development/uncertainty/bootstrap_intensity_fits_Alg2.rds",
+  alg3_intensity = "in_development/uncertainty/bootstrap_intensity_fits_Alg3.rds",
+  alg2_results = "in_development/uncertainty/threshold_values_uncertainty_results_Alg2.rds",
+  alg3_results = "in_development/uncertainty/bootstrap_model_selection_results_Alg3.rds"
+)
 
+# TODO: Change file paths when moved out of in_development
+
+output_paths <- list(
+  fig_1 = "outputs/figures/main/fig_1_eq_cat.pdf",
+  fig_2 = "outputs/figures/main/fig_2_geophone_network.pdf", 
+  fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
+  fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf",
+  fig_4 = "outputs/figures/main/fig_4_threshold_comparison.pdf",
+  fig_5 = "outputs/figures/main/fig_5_spatial_threshold.pdf",
+  fig_6 = "outputs/figures/main/fig_6_qq_plots.pdf",
+  fig_7_Alg2 = "outputs/figures/main/fig_7_eq_occurrence_properties_Alg2.pdf",
+  fig_7_Alg3 = "outputs/figures/main/fig_7_eq_occurrence_properties_Alg3.pdf",
+  fig_7_Alg2_and_3 = "outputs/figures/main/fig_7_eq_occurrence_properties_Alg2_and_3.pdf",
+  fig_8 = "outputs/figures/main/fig_8_intensity_maps.pdf",
+  data_3 = "data/covariates/average_ICS_max_1995-2055.rds"
+)
+
+chosen_years <- c("2010", "2020") # in Figure 2, plot geophone networks in these years
+
+gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
+geophones_deepest <- read.csv(file_paths$geophones_deepest, header = TRUE, row.names = 1)
+gron_outline <- read.csv(file_paths$gron_outline, header = TRUE)
+gron_polygon <- read.table(file_paths$gron_polygon, header = TRUE)
+
+gron_rect <- data.frame(X = c(210000, 275000, 275000, 210000, 210000),
+                        Y = c(560000, 560000, 625000, 625000, 560000))
+
+locations <- data.frame(Easting = c(250000, 250000, 250000), 
+                        Northing = c(575000, 590000, 605000))
+
+# load required libraries and functions ----------------------------------------
 library(ggplot2)
 library(ggspatial)
 library(pracma)
@@ -19,66 +55,193 @@ library(patchwork)
 source("src/helper_functions.R")
 source("src/intensity_estimation.R")
 
+# Creating relevant covariate files
+covariates <- do.call(
+  rbind,
+  lapply(1995:2024, function(y) {
+    read.csv(paste0(file_paths$covariates, y, ".csv"), header = TRUE)
+  })
+)
+covariates <- covariates %>% filter(MonthYear <= "2024-01")
+
+covariates_2055 <- do.call(
+  rbind,
+  lapply(1995:2055, function(y) {
+    read.csv(paste0(file_paths$covariates, y, ".csv"), header = TRUE)
+  })
+)
 
 # Figure 1 ----------------------------------------------------------------
 
-# changepoint threshold
+# changepoint threshold and earthquake locations
 change_index <- which(gron_eq_cat$Date == as.Date("2015-12-25"))
-pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat)-change_index))
+pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat) - change_index))
 
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,2), bg='transparent')
-plot(as.Date(gron_eq_cat$Date),gron_eq_cat$Magnitude, xlab="Time", ylab = expression(Magnitude~(M[L])), pch=19, col="grey", cex=0.7)
-lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
+gron_eq_cat_before_cp <- gron_eq_cat[1:change_index, ]
+gron_eq_cat_after_cp <- gron_eq_cat[(change_index + 1):nrow(gron_eq_cat), ]
 
-plot(gron_polygon$POINT_X, gron_polygon$POINT_Y, col="green", xlab="Easting (m)", ylab = "Northing (m)", type = 'l', lty=2, asp=1, lwd=2)
-points(gron_eq_cat$Easting, gron_eq_cat$Northing, pch=19, col="grey", cex=0.7, asp=1)
-lines(gron_outline$X, gron_outline$Y, col="black", asp=1)
+path <- output_paths$fig_1
+pdf(file = path, height = 5, width = 15)
+par(mfrow = c(1, 3), bg = 'transparent')
+plot(
+  x = as.Date(gron_eq_cat$Date),
+  y = gron_eq_cat$Magnitude,
+  xlab = "Time",
+  ylab = expression(Magnitude~(M[L])),
+  pch = 19,
+  col = "grey",
+  cex = 0.7)
+lines(
+  x = as.Date(gron_eq_cat$Date),
+  y = rep(1.45, nrow(gron_eq_cat)),
+  col = "red",
+  lty = 2,
+  lwd = 2)
+lines(x = as.Date(gron_eq_cat$Date), y = pc_threshold, col = "blue", lwd = 2)
+
+plot( 
+  x = gron_polygon$POINT_X,
+  y = gron_polygon$POINT_Y,
+  xlab = "Easting (km)",
+  ylab = "Northing (km)",
+  type = 'l',
+  lty = 2,
+  asp = 1,
+  lwd = 2,
+  xaxt = "n",
+  yaxt = "n")
+points(x = gron_eq_cat_before_cp$Easting, y = gron_eq_cat_before_cp$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
+lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black", asp = 1)
+
+# adjust labels to be in km
+at_values <- axTicks(1)
+new_labels <- at_values / 1000
+axis(1, at = at_values, labels = new_labels)
+
+at_values <- axTicks(2) 
+new_labels <- at_values / 1000 
+axis(2, at = at_values, labels = new_labels)
+
+plot( 
+  x = gron_polygon$POINT_X,
+  y = gron_polygon$POINT_Y,
+  xlab = "Easting (km)",
+  ylab = "Northing (km)",
+  type = 'l',
+  lty = 2,
+  asp = 1,
+  lwd = 2,
+  xaxt = "n",
+  yaxt = "n")
+points(x = gron_eq_cat_after_cp$Easting, y = gron_eq_cat_after_cp$Northing, pch = 19, col = "grey", cex = 0.7, asp = 1)
+lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black", asp = 1)
+
+# adjust labels to be in km
+at_values <- axTicks(1)
+new_labels <- at_values / 1000
+axis(1, at = at_values, labels = new_labels)
+
+at_values <- axTicks(2) 
+new_labels <- at_values / 1000 
+axis(2, at = at_values, labels = new_labels)
+
+dev.off()
 
 # Figure 2 ----------------------------------------------------------------
 
 # Number of geophones over time
-dates <- seq(min(as.Date(gron_eq_cat$Date)), max(as.Date(gron_eq_cat$Date)), by="day")
+dates <- seq(from = min(as.Date(gron_eq_cat$Date)),
+             to = max(as.Date(gron_eq_cat$Date)),
+             by = "day")
 num_geophones_in_rect <- numeric(length(dates))
 num_geophones_in_polygon <- numeric(length(dates))
 num_geophones_in_gasfield <- numeric(length(dates))
-geophones_in_rect <- geophones_deepest[inpolygon(geophones_deepest$Xcoord, geophones_deepest$Ycoord, gron_rect$X, gron_rect$Y),]
-geophones_in_polygon <- geophones_deepest[inpolygon(geophones_deepest$Xcoord, geophones_deepest$Ycoord, gron_polygon$POINT_X, gron_polygon$POINT_Y),]
-geophones_in_gasfield <- geophones_deepest[inpolygon(geophones_deepest$Xcoord, geophones_deepest$Ycoord, gron_outline$Easting, gron_outline$Northing),]
-for(i in 1:length(dates)){
+
+# subset of geophones belonging to each spatial region
+
+geophones_deepest$in_rect  <- inpolygon(geophones_deepest$Xcoord,
+                                        geophones_deepest$Ycoord,
+                                        gron_rect$X,
+                                        gron_rect$Y)
+geophones_deepest$in_poly  <- inpolygon(geophones_deepest$Xcoord,
+                                        geophones_deepest$Ycoord,
+                                        gron_polygon$POINT_X,
+                                        gron_polygon$POINT_Y)
+geophones_deepest$in_field <- inpolygon(geophones_deepest$Xcoord,
+                                        geophones_deepest$Ycoord,
+                                        gron_outline$Easting,
+                                        gron_outline$Northing)
+
+geophones_in_rect <- filter(geophones_deepest, in_rect)
+geophones_in_polygon <- filter(geophones_deepest, in_poly)
+geophones_in_gasfield <- filter(geophones_deepest, in_field)
+
+filter_to_date <- function(df, date){df[df$Start_date <= date & df$End_date >= date,]}
+
+for (i in seq_along(dates)) {
   date <- dates[i]
-  current_geo_in_rect <- geophones_in_rect[geophones_in_rect$Start_date <= date & geophones_in_rect$End_date >= date,]
-  current_geo_in_polygon <- geophones_in_polygon[geophones_in_polygon$Start_date <= date & geophones_in_polygon$End_date >= date,]
-  current_geo_in_gasfield <- geophones_in_gasfield[geophones_in_gasfield$Start_date <= date & geophones_in_gasfield$End_date >= date,]
-  num_geophones_in_rect[i] <- nrow(current_geo_in_rect)
-  num_geophones_in_polygon[i] <- nrow(current_geo_in_polygon)
-  num_geophones_in_gasfield[i] <- nrow(current_geo_in_gasfield)
+  num_geophones_in_rect[i] <- filter_to_date(geophones_in_rect, date) |> nrow()
+  num_geophones_in_polygon[i] <- filter_to_date(geophones_in_polygon, date) |> nrow()
+  num_geophones_in_gasfield[i] <- filter_to_date(geophones_in_gasfield, date) |> nrow() 
+  if (i %% 250 == 0) cat(i, " of ", length(dates), "\n")
 }
 
-dev.new(height=5, width=15, noRStudioGD = TRUE)
-par(mfrow=c(1,3), bg='transparent')
-plot(dates, num_geophones_in_rect, xlab="Time", ylab = "Number of geophones", type='l', col="blue")
-lines(dates, num_geophones_in_polygon, col="green")
-lines(dates, num_geophones_in_gasfield, col="black")
+# construct plots
+path <- output_paths$fig_2
+pdf(file = path, height = 5, width = 15)
+par(mfrow = c(1, 3), bg = 'transparent')
+
+plot(
+  x = dates,
+  y = num_geophones_in_rect,
+  xlab = "Time",
+  ylab = "Number of geophones",
+  type = 'l',
+  col = "blue")
+lines(x = dates, y = num_geophones_in_polygon, col = "green")
+lines(x = dates, y = num_geophones_in_gasfield, col = "black")
 
 # Spatial plots of geophones active in particular years
-chosen_years <- c("2010", "2020")
-for(year in chosen_years){
-  current_geophones <- geophones_deepest[stringr::str_sub(geophones_deepest$Start_date, 1, 4) <= year & stringr::str_sub(geophones_deepest$End_date, 1, 4) >= year,]
-  plot(gron_polygon$POINT_X, gron_polygon$POINT_Y, col="green", xlab="Easting (m)", ylab = "Northing (m)", type = 'l', lty=2, lwd=2, asp=1)
-  points(current_geophones$Xcoord, current_geophones$Ycoord, pch=4, col="blue", cex=0.7)
-  lines(gron_outline$X, gron_outline$Y, col="black")
+for (year in chosen_years) {
+  is_in_year <- stringr::str_sub(geophones_deepest$Start_date, 1, 4) <= year &
+    stringr::str_sub(geophones_deepest$End_date, 1, 4) >= year
+  current_geophones <- geophones_deepest[is_in_year,]
+  plot(
+    x = gron_polygon$POINT_X, 
+    y = gron_polygon$POINT_Y,
+    col = "black",
+    xlab = "Easting (km)",
+    ylab = "Northing (km)",
+    type = 'l',
+    lty = 2,
+    lwd = 2,
+    asp = 1,
+    xaxt = "n",
+    yaxt = "n")
+  points(x = current_geophones$Xcoord,
+         y = current_geophones$Ycoord,
+         pch = 4,
+         col = "blue",
+         cex = 0.7)
+  lines(x = gron_outline$Easting, y = gron_outline$Northing, col = "black")
+  # adjust labels to be in km
+  at_values <- axTicks(1)
+  new_labels <- at_values / 1000
+  axis(1, at = at_values, labels = new_labels)
+  
+  at_values <- axTicks(2) 
+  new_labels <- at_values / 1000 
+  axis(2, at = at_values, labels = new_labels)
+  
 }
-
+dev.off()
 
 # Figure 3 ----------------------------------------------------------------
 
 # Average Kaiser stress plots for different years -------------------------
 
 # Filter data for the selected year
-current_covariates <- covariates %>%
-  filter(Year == "2020")  # Assuming Year is character; if it's numeric, use 2020
+current_covariates <- filter(covariates, Year == "2020")
 
 # Compute average ICS_max per grid cell
 plot_df <- current_covariates %>%
@@ -88,103 +251,185 @@ plot_df <- current_covariates %>%
 
 # Plot
 
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
 
-ggplot(plot_df, aes(x = Easting, y = Northing, fill = Average_ICS)) +
+path <- output_paths$fig_3a 
+pdf(file = path, height = 5, width = 5)
+ggplot(
+  data = plot_df,
+  aes(x = Easting, y = Northing, fill = Average_ICS)) +
   geom_tile() +
   scale_fill_gradient(low = "red", high = "yellow") +
+  geom_point(data = gron_outline,
+             aes(x = Easting, y = Northing),
+             size = 0.5,
+             shape = 1,
+             fill = "black") +
+  geom_point(data = locations[1,],
+             aes(x = Easting, y = Northing),
+             size = 4,
+             shape = 21,
+             fill = "purple",
+             color = "black") +
+  geom_point(data = locations[2,],
+             aes(x = Easting, y = Northing),
+             size = 4,
+             shape = 21,
+             fill = "darkgreen",
+             color = "black") +
+  geom_point(data = locations[3,],
+             aes(x = Easting, y = Northing),
+             size = 4,
+             shape = 21,
+             fill = "orange",
+             color = "black") +
   coord_fixed() +
   theme_classic() +
   theme(plot.background = element_blank()) +
-  geom_point(data = gron_outline, aes(x = Easting, y = Northing), size = 0.5, shape = 1, fill = "black") +
-  geom_point(data = locations, aes(x = Easting, y = Northing), size = 2, shape = 19, fill = "black") +
-  labs(x = "Easting (m)", y = "Northing (m)", fill = "Average KS")
-
+  labs(x = "Easting (km)", y = "Northing (km)", fill = "Average KS") +
+  scale_x_continuous(labels = function(x) x / 1000) +
+  scale_y_continuous(labels = function(y) y / 1000)
+dev.off()
 
 # Average max stress over time (including future)
 average_ICS_df <- covariates_2055 %>%
   group_by(Date) %>%
-  summarise(average_ICS = mean(ICS_max, na.rm = TRUE), .groups = "drop")
+  summarise(average_ICS = mean(ICS_max, na.rm = TRUE), .groups = "drop") %>% 
+  mutate(Date = as.Date(Date))
 
-# saveRDS(average_ICS_df, file = "Data/covariates/average_ICS_max_1995-2055.rds")
+if (!file.exists(output_paths$data_3)) {
+  saveRDS(average_ICS_df, file = output_paths$data_3)
+}
 
-#Adding three locations
-locations <- data.frame(Easting = c(250000, 250000, 250000), Northing = c(575000, 590000, 605000))
-ics_at_location_1 <- covariates_2055$ICS_max[covariates_2055$Easting == locations$Easting[1] & covariates_2055$Northing == locations$Northing[1]]
-ics_at_location_2 <- covariates_2055$ICS_max[covariates_2055$Easting == locations$Easting[2] & covariates_2055$Northing == locations$Northing[2]]
-ics_at_location_3 <- covariates_2055$ICS_max[covariates_2055$Easting == locations$Easting[3] & covariates_2055$Northing == locations$Northing[3]]
+ics_at_locations <- vector(mode = "list", length = nrow(locations))
+for (i in 1:nrow(locations)) {
+  ics_at_locations[[i]] <- covariates_2055 %>%  
+    filter(Easting == locations$Easting[i] & Northing == locations$Northing[i]) %>% 
+    pull(ICS_max)
+}
 
-dates <- as.Date(average_ICS_df$Date)
-
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-plot(dates, average_ICS_df$average_ICS, xlab = "Time", ylab = "Average KS (MPa)", type = 'l', lwd=2, ylim = c(0, 0.4), col="black")
-lines(dates, ics_at_location_1, col="blue", lwd=2)
-lines(dates, ics_at_location_2, col="green", lwd=2)
-lines(dates, ics_at_location_3, col="red", lwd=2)
-
+path <- output_paths$fig_3b
+pdf(file = path, height = 5, width = 5)
+par(mfrow = c(1,1), bg = 'transparent')
+plot(x = average_ICS_df$Date,
+     y = average_ICS_df$average_ICS,
+     xlab = "Time",
+     ylab = "Average KS (MPa)",
+     type = 'l',
+     lwd = 2,
+     ylim = c(0, 0.4),
+     col = "black")
+lines(average_ICS_df$Date, ics_at_locations[[1]], lwd = 2, col = "purple")
+lines(average_ICS_df$Date, ics_at_locations[[2]], lwd = 2, col = "darkgreen",)
+lines(average_ICS_df$Date, ics_at_locations[[3]], lwd = 2, col = "orange")
+dev.off()
 
 
 # Figure 4 ----------------------------------------------------------------
 
-# Best performing threshold (based on EQD)
-thresh_fit_A2 <- readRDS("threshold_results/geo_thresh_fit_V2.rds")
-thresh_fit_B1 <- readRDS("threshold_results/geo_thresh_fit_logV1.rds")
-thresh_fit_C2 <- readRDS("threshold_results/geo_thresh_fit_sqrtV2.rds")
+# Load best performing thresholds (based on EQD)
+thresh_fit_A2 <- readRDS("outputs/threshold_results/geo_thresh_fit_V2.rds")
+thresh_fit_B1 <- readRDS("outputs/threshold_results/geo_thresh_fit_logV1.rds")
+thresh_fit_C2 <- readRDS("outputs/threshold_results/geo_thresh_fit_sqrtV2.rds")
 
-# Observed thresholds
-gron_eq_cat$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * gron_eq_cat$V_2
-gron_eq_cat$threshold_B1 <- thresh_fit_B1$thresh_par[1] + thresh_fit_B1$thresh_par[2] * log(gron_eq_cat$V_1)
-gron_eq_cat$threshold_C2 <- thresh_fit_C2$thresh_par[1] + thresh_fit_C2$thresh_par[2] * sqrt(gron_eq_cat$V_2)
+# add threshold values (and differences) at each earthquake location
+gron_eq_cat <- gron_eq_cat %>% mutate(
+  Date = as.Date(Date),
+  threshold_A2 = thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V_2,
+  threshold_B1 = thresh_fit_B1$thresh_par[1] + thresh_fit_B1$thresh_par[2] * log(V_2),
+  threshold_C2 = thresh_fit_C2$thresh_par[1] + thresh_fit_C2$thresh_par[2] * sqrt(V_2),
+  threshold_PC = if_else(as.Date(Date) > "2015-12-25", true = 0.76, false = 1.15),
+  threshold_con = 1.45, 
+  diff_thr_B1 = threshold_A2 - threshold_B1, 
+  diff_thr_C2 = threshold_A2 - threshold_C2
+)
 
-# changepoint threshold
-change_index <- which(gron_eq_cat$Date == as.Date("2015-12-25"))
-pc_threshold <- c(rep(1.15, change_index), rep(0.76, nrow(gron_eq_cat)-change_index))
-
-# average A2 threshold over space
+# Evaluate threshold A2 threshold for entire observation window
 covariates$threshold_A2 <- thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * covariates$V2
-covariates_in_gasfield <- covariates[inpolygon(covariates$Easting, covariates$Northing, gron_outline$Easting, gron_outline$Northing),]
 
-average_A2_threshold_over_field <- covariates_in_gasfield %>%
+# Add indicator of which spatio-temporal grid cells are within the field outline
+# (for efficiency, do first time point and repeat)
+cov_slice <- covariates %>% filter(MonthYear == "1995-04")
+in_field <- inpolygon(cov_slice$Easting,
+                      cov_slice$Northing,
+                      gron_outline$Easting,
+                      gron_outline$Northing)
+n_MonthYear <- length(unique(covariates$MonthYear))
+covariates$in_field <- rep(x = in_field, times = n_MonthYear)
+rm(cov_slice, n_MonthYear, in_field)
+
+
+average_A2_threshold_over_field <- covariates %>% 
+  filter(in_field) %>%
   group_by(Date) %>%
   summarise(threshold = mean(threshold_A2, na.rm = TRUE), .groups = "drop")
 
-locations <- data.frame(Easting = c(250000, 250000, 250000), Northing = c(575000, 590000, 605000))
-threshold_loc1 <- covariates$threshold_A2[covariates$Easting == locations$Easting[1] & covariates$Northing == locations$Northing[1]]
-threshold_loc2 <- covariates$threshold_A2[covariates$Easting == locations$Easting[2] & covariates$Northing == locations$Northing[2]]
-threshold_loc3 <- covariates$threshold_A2[covariates$Easting == locations$Easting[3] & covariates$Northing == locations$Northing[3]]
+thresh_A2_at_locations <- vector("list", length = nrow(locations))
+for (i in 1:3) {
+  ei <- locations$Easting[i]
+  ni <- locations$Northing[i]
+  
+  thresh_A2_at_locations[[i]] <- covariates %>% 
+    filter(Easting == ei & Northing == ni) %>% 
+    pull(threshold_A2)
+}
+rm(ei, ni)
 
+# Create figures ---
+path = output_paths$fig_4
+pdf(file = path, height = 5, width = 5)
+par(mfrow = c(1,1), bg = 'transparent')
 
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab="Event time", ylab = expression(Magnitude~(M[L])), pch=19, col="grey", cex=0.7)
-lines(as.Date(gron_eq_cat$Date), gron_eq_cat$threshold_A2, lwd=2)
-lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
-lines(as.Date(average_A2_threshold_over_field$Date[-1]), average_A2_threshold_over_field$threshold[-1], lwd=2, col="green")
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$Magnitude,
+  xlab = "Event time",
+  ylab = expression(Magnitude~(M[L])),
+  pch = 19,
+  col = "grey",
+  cex = 0.7)
+with(gron_eq_cat, lines(x = Date, y = threshold_A2, lwd = 2))
+with(gron_eq_cat, lines(x = Date, y = threshold_con, col = "red", lty = 2, lwd = 2))
+with(gron_eq_cat, lines(x = Date, y = pc_threshold, col = "blue", lwd = 2))
+with(average_A2_threshold_over_field[-1,], lines(x = as.Date(Date), y = threshold, lwd = 2, col = "green"))
 
-plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab="Event time", ylab = expression(Magnitude~(M[L])), pch=19, col="grey", cex=0.7)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc1[-1], col="purple", lwd=2)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc2[-1], col="darkgreen", lwd=2)
-lines(as.Date(unique(covariates$Date)[-1]), threshold_loc3[-1], col="orange", lwd=2,)
-lines(as.Date(gron_eq_cat$Date),rep(1.45, nrow(gron_eq_cat)), col="red", lty=2, lwd=2)
-lines(as.Date(gron_eq_cat$Date), pc_threshold, col="blue", lwd=2)
+thresh_df <- data.frame(
+  date = as.Date(unique(covariates$Date)[-1]),
+  loc_1 = thresh_A2_at_locations[[1]][-1],
+  loc_2 = thresh_A2_at_locations[[2]][-1],
+  loc_3 = thresh_A2_at_locations[[3]][-1])
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$Magnitude,
+  xlab = "Event time",
+  ylab = expression(Magnitude~(M[L])),
+  pch = 19,
+  col = "grey",
+  cex = 0.7)
+lines(x = thresh_df$date, y = thresh_df$loc_1, lwd = 2, col = "purple")
+lines(x = thresh_df$date, y = thresh_df$loc_2, lwd = 2, col = "darkgreen")
+lines(x = thresh_df$date, y = thresh_df$loc_3, lwd = 2, col = "orange")
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$threshold_con, lty = 2, lwd = 2, col = "red")
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$threshold_PC, lwd = 2, col = "blue")
+rm(thresh_df)
 
-diff_thr_B1 <- gron_eq_cat$threshold_A2 - gron_eq_cat$threshold_B1
-diff_thr_C2 <- gron_eq_cat$threshold_A2 - gron_eq_cat$threshold_C2
-
-plot(as.Date(gron_eq_cat$Date), diff_thr_B1, xlab="Event time", ylab = "Difference in threshold", col="yellow", type='l', 
-     ylim=c(min(diff_thr_B1, diff_thr_C2), max(diff_thr_B1, diff_thr_C2)))
-lines(as.Date(gron_eq_cat$Date), diff_thr_C2, col="red")
-abline(h=0, col="black", lty=2)
-
+y_min <- min(gron_eq_cat$diff_thr_B1, gron_eq_cat$diff_thr_C2)
+y_max <- max(gron_eq_cat$diff_thr_B1, gron_eq_cat$diff_thr_C2)
+plot(
+  x = gron_eq_cat$Date,
+  y = gron_eq_cat$diff_thr_B1,
+  xlab = "Event time",
+  ylab = "Difference in threshold",
+  col = "yellow",
+  type = 'l', 
+  ylim = c(y_min, y_max))
+lines(x = gron_eq_cat$Date, y = gron_eq_cat$diff_thr_C2, col = "red")
+abline(h = 0, col = "black", lty = 2)
+rm(y_min, y_max)
+dev.off()
 
 # Figure 5 ----------------------------------------------------------------
 
 # Spatial threshold plots
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
 
 # Ensure proper date conversion
 covariates$Date <- as.Date(covariates$Date)
@@ -205,16 +450,26 @@ plot_threshold_for_date <- function(date) {
     filter(inpolygon(Xcoord, Ycoord, gron_polygon$POINT_X, gron_polygon$POINT_Y))
   
   ggplot(current_covariates, aes(x = Easting, y = Northing, fill = best_threshold)) +
-    geom_tile() + fixed_plot_aspect(ratio = 1) +
+    geom_tile() + 
+    fixed_plot_aspect(ratio = 1) +
     scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
     coord_fixed() +
+    geom_point(data = current_geo_in_polygon, 
+               aes(x = Xcoord, y = Ycoord),
+               size = 1,
+               shape = 19,
+               fill = "black") +
+    labs(fill = "Threshold", x = "Easting (km)", y = "Northing (km)") + 
     theme_classic() +
-    geom_point(data = current_geo_in_polygon, aes(x = Xcoord, y = Ycoord), size = 1, shape = 19, fill = "black") +
-    labs(fill = "Threshold", x = "Easting (m)", y = "Northing (m)") 
+    scale_x_continuous(labels = function(x) x / 1000) +
+    scale_y_continuous(labels = function(y) y / 1000)
 }
 
-# Generate plots
 plots <- lapply(chosen_dates, plot_threshold_for_date)
+
+path = output_paths$fig_5
+pdf(file = path, height = 5, width = 10)
+par(mfrow = c(1,1), bg = 'transparent')
 
 # Confirm that both are valid ggplot objects
 if (all(sapply(plots, inherits, "ggplot"))) {
@@ -224,70 +479,91 @@ if (all(sapply(plots, inherits, "ggplot"))) {
   stop("One or more plots are not ggplot objects.")
 }
 
+dev.off()
 
 
 # Figure 6 ----------------------------------------------------------------
 
 #QQplots
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
+path <- output_paths$fig_6
+pdf(file = path, height=5, width=15)  
+par(mfrow=c(1,3), bg='transparent')
 
 threshold <- 1.45
+excess_data <- filter(gron_eq_cat, Magnitude > threshold)
+excesses <- excess_data$Magnitude - threshold
 
-excess_data <- gron_eq_cat[gron_eq_cat$Magnitude > threshold,]
+fit_obs_without_KS <- optim(
+  fn = GPD_LL, 
+  par = c(mean(excesses), 0.1), 
+  z = excesses, 
+  control = list(fnscale = -1))
 
-fit_obs <- optim(GPD_LL_given_V_ICS, par = c(0.1, 0, 0.1), excess = excess_data$Magnitude - threshold,
-                 thresh_par = c(1.45, 0), V = excess_data$V_1, ics = excess_data$ICS_max,
-                 control = list(fnscale = -1))
+fit_obs_with_KS <- optim(
+  fn = GPD_LL_given_V_ICS,
+  par = c(0.1, 0, 0.1),
+  excess = excesses,
+  thresh_par = c(1.45, 0),
+  V = excess_data$V_1,
+  ics = excess_data$ICS_max,
+  control = list(fnscale = -1))
 
+thresh_fit_with_KS <- list(thresh_par = c(1.45, 0), par = fit_obs_with_KS$par)
 
-thresh_fit <- list(thresh_par = c(1.45, 0), par = fit_obs$par)
-set.seed(11111)
-get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
-set.seed(11111)
+pdf(file = output_paths$fig_6, height = 5, width = 15)
+par(mfrow = c(1,3), bg = 'transparent')
+
+get_qq_plot_const(gron_eq_cat$Magnitude, threshold, main="" )
+get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_with_KS, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="" )
 get_qq_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="" )
 
-#PPplots (in supp)
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-
-set.seed(11111)
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit, gron_eq_cat$V_1, gron_eq_cat$ICS_max, main="", n_boot=1000 )
-set.seed(11111)
-get_pp_plot_geo_ics(gron_eq_cat$Magnitude, thresh_fit_A2, gron_eq_cat$V_2, gron_eq_cat$ICS_max, main="", n_boot=1000 )
-
+dev.off()
 
 
 # Poisson process intensity fit -------------------------------------------
 
-gron_eq_cat_exceed_A2 <- gron_eq_cat[gron_eq_cat$Magnitude > gron_eq_cat$threshold_A2,] 
+gron_eq_cat_exceed_A2 <- filter(gron_eq_cat, Magnitude > threshold_A2)
+gron_eq_cat_exceed_0 <- filter(gron_eq_cat, Magnitude > 0)
+
 #Checking how many events are removed by dsmaxdt condition
 sum(gron_eq_cat_exceed_A2$dsmaxdt == 0)
 
+cat("Fitting Poissson process model to excesses of threshold A2 ... \n")
+opt_PP_LL_icsmax <- optim(
+  fn = Poisson_process_LL_icsmax,
+  par = c(0.1, 0),
+  data = gron_eq_cat,
+  covariates = covariates,
+  threshold_obs = gron_eq_cat$threshold_A2,
+  covariates_threshold = covariates$best_threshold,
+  thresh_fit = thresh_fit_A2, 
+  control = list(fnscale = -1),
+  hessian = TRUE)
+cat("Done.")
+se <- sqrt(diag(solve(-opt_PP_LL_icsmax$hessian)))
+CIs <- cbind(opt_PP_LL_icsmax$par - qnorm(0.975) * se, opt_PP_LL_icsmax$par + qnorm(0.975) * se)
 
-(opt_PP_LL_icsmax <- optim(Poisson_process_LL_icsmax, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates, 
-                           threshold_obs = gron_eq_cat$threshold_A2, covariates_threshold = covariates$best_threshold , 
-                           thresh_fit = thresh_fit_A2, control=list(fnscale=-1), hessian=T))
-
-(se <- sqrt(diag(solve(-opt_PP_LL_icsmax$hessian))))
-(CIs <- cbind(opt_PP_LL_icsmax$par - qnorm(0.975) * se, opt_PP_LL_icsmax$par + qnorm(0.975) * se))
-
-# Corresponding par ests if using the intensity above conservative threshold
-# as in Bourne 2018
-#Checking how many events are removed by dsmaxdt condition
-gron_eq_cat_exceed_1.45 <- gron_eq_cat[gron_eq_cat$Magnitude > 1.45,]
+# Corresponding par ests if using the intensity above conservative threshold,
+# as in Bourne 2018, and check how many events are removed by dsmaxdt condition
+gron_eq_cat_exceed_1.45 <- filter(gron_eq_cat, Magnitude > 1.45)
 sum(gron_eq_cat_exceed_1.45$dsmaxdt == 0)
 
-(opt_PP_LL_icsmax_conserv <- optim(Poisson_process_LL_const_thresh, par = c(0.1, 0), data = gron_eq_cat, covariates = covariates, 
-                                   threshold = 1.45, control=list(fnscale=-1), hessian=T))
-
-(se <- sqrt(diag(solve(-opt_PP_LL_icsmax_conserv$hessian))))
-(CIs <- cbind(opt_PP_LL_icsmax_conserv$par - qnorm(0.975) * se, opt_PP_LL_icsmax_conserv$par + qnorm(0.975) * se))
-
+cat("Fitting Poissson process model to excesses of 1.45 M_L ... \n")
+opt_PP_LL_icsmax_conserv <- optim(
+  fn = Poisson_process_LL_const_thresh,
+  par = c(0.1, 0),
+  data = gron_eq_cat,
+  covariates = covariates, 
+  threshold = 1.45,
+  control = list(fnscale = -1),
+  hessian = TRUE)
+cat("Done.")
+se <- sqrt(diag(solve(-opt_PP_LL_icsmax_conserv$hessian)))
+CIs <- cbind(opt_PP_LL_icsmax_conserv$par - qnorm(0.975) * se, opt_PP_LL_icsmax_conserv$par + qnorm(0.975) * se)
 
 # Resulting intensities
-covariates$intensity_above_threshold_A2 <- resulting_intensity_icsmax(opt_PP_LL_icsmax, covariates, covariates$best_threshold, thresh_fit_A2)
-covariates$intensity_above_0 <- resulting_intensity_icsmax(opt_PP_LL_icsmax, covariates, 0, thresh_fit_A2)
+covariates$intensity_above_threshold_A2 <- resulting_intensity_icsmax(opt_PP_LL_icsmax$par, covariates, covariates$best_threshold, thresh_fit_A2$par)
+covariates$intensity_above_0 <- resulting_intensity_icsmax(opt_PP_LL_icsmax$par, covariates, 0, thresh_fit_A2$par)
 
 grid_box_E <- (max(unique(covariates$Easting))-min(unique(covariates$Easting)))/length(unique(covariates$Easting))
 grid_box_N <- (max(unique(covariates$Northing))-min(unique(covariates$Northing)))/length(unique(covariates$Northing))
@@ -297,15 +573,12 @@ covariates$lambda_A2_per_km2 <- covariates$intensity_above_threshold_A2/grid_box
 
 # Figure 7 ----------------------------------------------------------------
 
-# Aggregated intensity over space for all years ------------
 
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-
-#Aggregated intensity by year
+#Aggregated intensity above A2 by year
 agg_intensity_df <- covariates %>%
   group_by(Year) %>%
-  summarise(agg_intensity = sum(intensity_above_threshold_A2, na.rm = TRUE), .groups = "drop")
+  summarise(agg_intensity_A2 = sum(intensity_above_threshold_A2, na.rm = TRUE), 
+            agg_intensity_0 = sum(intensity_above_0, na.rm = TRUE), .groups = "drop") 
 
 # Remove last year
 agg_intensity_df <- agg_intensity_df[agg_intensity_df$Year != max(agg_intensity_df$Year),]
@@ -314,64 +587,121 @@ agg_intensity_df <- agg_intensity_df[agg_intensity_df$Year != max(agg_intensity_
 # NOTE: Below filters out exceedances corresponding to dsmaxdt =0 to make sure plots
 # are comparing observed values which correspond to how intensity was estimated
 
-num_exceedances_per_year <- gron_eq_cat_exceed_A2 %>% filter(dsmaxdt > 0) %>%
-  group_by(Year) %>%  summarise(num_exceedances = n(), .groups = "drop")
+num_exceedances_per_year_A2 <- gron_eq_cat_exceed_A2 %>% filter(dsmaxdt > 0) %>%
+  group_by(Year) %>%  summarise(num_exceedances_A2 = n(), .groups = "drop")
+
+num_exceedances_per_year_0 <- gron_eq_cat_exceed_0 %>% filter(dsmaxdt > 0) %>%
+  group_by(Year) %>% summarise(num_exceedances_0 = n(), .groups = "drop")
 
 # Convert Year to numeric for merging
 agg_intensity_df$Year <- as.numeric(as.character(agg_intensity_df$Year))
 
 # Merge the two data frames
 agg_intensity_df <- agg_intensity_df %>%
-  left_join(num_exceedances_per_year, by = "Year")
-#Adding zeros for number of exceedances in first two years
-agg_intensity_df$num_exceedances[is.na(agg_intensity_df$num_exceedances)] <- 0
+  left_join(num_exceedances_per_year_A2, by = "Year") %>%
+  left_join(num_exceedances_per_year_0, by = "Year") 
 
-# Plot agg intensity and number of exceedances against year
+#Adding zeros for number of exceedances in first two years
+agg_intensity_df$num_exceedances_A2[is.na(agg_intensity_df$num_exceedances_A2)] <- 0
+
+
+# Bootstrap uncertainty bounds on aggregated intensity
+threshold_fit_Alg2 <- readRDS(file_paths$alg2_results)
+boot_intensity_fits_Alg2 <- readRDS(file_paths$alg2_intensity)
+
+threshold_fit_Alg3 <- readRDS(file_paths$alg3_results)
+boot_intensity_fits_Alg3 <- readRDS(file_paths$alg3_intensity)
+
+# Alg 2
+boot_mat_A2_Alg2 <- boot_mat_0_Alg2 <- matrix(NA, 
+                                              nrow = nrow(boot_intensity_fits_Alg2), 
+                                              ncol = nrow(agg_intensity_df))
+
+# TODO resulting_intensity function has been changed for this.. Make sure other related code is edited accordingly
+for (i in 1:nrow(boot_intensity_fits_Alg2)) {
+  covariates$boot_thresh <- threshold_fit_Alg2[[i]]$thresh_par[1] + threshold_fit_Alg2[[i]]$thresh_par[2] * covariates$V2
+  covariates$boot_intensity_A2 <- resulting_intensity_icsmax(boot_intensity_fits_Alg2[i,], covariates, covariates$boot_thresh, threshold_fit_Alg2[[i]]$par)
+  covariates$boot_intensity_0 <- resulting_intensity_icsmax(boot_intensity_fits_Alg2[i,], covariates, 0, threshold_fit_Alg2[[i]]$par)
+  boot_mat_A2_Alg2[i, ] <- covariates %>%
+    group_by(Year) %>%
+    summarise(agg_intensity = sum(boot_intensity_A2, na.rm = TRUE), .groups = "drop") %>%
+    filter(Year != max(agg_intensity_df$Year)) %>%
+    pull(agg_intensity)
+  boot_mat_0_Alg2[i, ] <- covariates %>%
+    group_by(Year) %>%
+    summarise(agg_intensity = sum(boot_intensity_0, na.rm = TRUE), .groups = "drop") %>%
+    filter(Year != max(agg_intensity_df$Year)) %>%
+    pull(agg_intensity)
+}
+
+
+agg_intensity_df$lower_CI_A2_Alg2 <- apply(boot_mat_A2_Alg2, 2, quantile, probs = 0.025)
+agg_intensity_df$upper_CI_A2_Alg2 <- apply(boot_mat_A2_Alg2, 2, quantile, probs = 0.975)
+agg_intensity_df$lower_CI_0_Alg2 <- apply(boot_mat_0_Alg2, 2, quantile, probs = 0.025)
+agg_intensity_df$upper_CI_0_Alg2 <- apply(boot_mat_0_Alg2, 2, quantile, probs = 0.975)
+
+# Alg 3
+
+chosen_models <- do.call(rbind, lapply(threshold_fit_Alg3, function(x){
+  x$chosen_form
+}))
+
+covariates_distances <- cbind(covariates$V1, covariates$V2, covariates$V3, covariates$V4,
+                              log(covariates$V1), log(covariates$V2), log(covariates$V3), log(covariates$V4),
+                              sqrt(covariates$V1), sqrt(covariates$V2), 
+                              sqrt(covariates$V3), sqrt(covariates$V4))
+
+
+boot_mat_A2_Alg3 <-  boot_mat_0_Alg3 <- matrix(NA, 
+                                               nrow = nrow(boot_intensity_fits_Alg3), 
+                                               ncol = nrow(agg_intensity_df))
+
+# TODO resulting_intensity function has been changed for this.. Make sure other related code is edited accordingly
+for (i in 1:nrow(boot_intensity_fits_Alg3)) {
+  covariates$boot_thresh <- threshold_fit_Alg3[[i]]$model_results$thresh_par[1] + threshold_fit_Alg3[[i]]$model_results$thresh_par[2] * covariates_distances[,chosen_models[i]]
+  covariates$boot_intensity_A2 <- resulting_intensity_icsmax(boot_intensity_fits_Alg3[i,], covariates, covariates$boot_thresh, threshold_fit_Alg3[[i]]$model_results$par)
+  covariates$boot_intensity_0 <- resulting_intensity_icsmax(boot_intensity_fits_Alg3[i,], covariates, 0, threshold_fit_Alg3[[i]]$model_results$par)
+  boot_mat_A2_Alg3[i, ] <- covariates %>%
+    group_by(Year) %>%
+    summarise(agg_intensity = sum(boot_intensity_A2, na.rm = TRUE), .groups = "drop") %>%
+    filter(Year != max(agg_intensity_df$Year)) %>%
+    pull(agg_intensity)
+  boot_mat_0_Alg3[i, ] <- covariates %>%
+    group_by(Year) %>%
+    summarise(agg_intensity = sum(boot_intensity_0, na.rm = TRUE), .groups = "drop") %>%
+    filter(Year != max(agg_intensity_df$Year)) %>%
+    pull(agg_intensity)
+}
+
+agg_intensity_df$lower_CI_A2_Alg3 <- apply(boot_mat_A2_Alg3, 2, quantile, probs = 0.025)
+agg_intensity_df$upper_CI_A2_Alg3 <- apply(boot_mat_A2_Alg3, 2, quantile, probs = 0.975)
+agg_intensity_df$lower_CI_0_Alg3 <- apply(boot_mat_0_Alg3, 2, quantile, probs = 0.025)
+agg_intensity_df$upper_CI_0_Alg3 <- apply(boot_mat_0_Alg3, 2, quantile, probs = 0.975)
+
+
+# Alg 2 only
+pdf(file = output_paths$fig_7_Alg2, height=5, width=5)
+par(mfrow=c(1,3), bg='transparent')
+
+# Plot agg intensity above A2 and number of exceedances against year
 ggplot(agg_intensity_df, aes(x = Year)) +
-  geom_point(aes(y = agg_intensity*grid_box_area, color = "Aggregated Intensity"), size = 2) +
-  geom_line(aes(y = agg_intensity*grid_box_area, color = "Aggregated Intensity"), size = 1) +
-  geom_point(aes(y = num_exceedances , color = "Number of Exceedances"), size = 2) +
-  geom_line(aes(y = num_exceedances, color = "Number of Exceedances"), size = 1) +
+  geom_point(aes(y = agg_intensity_A2*grid_box_area, color = "Aggregated Intensity"), size = 2) +
+  geom_line(aes(y = agg_intensity_A2*grid_box_area, color = "Aggregated Intensity"), size = 1) +
+  geom_ribbon(aes(ymin = lower_CI_A2_Alg2*grid_box_area, ymax = upper_CI_A2_Alg2*grid_box_area), alpha = 0.2, fill = "blue") +
+  geom_point(aes(y = num_exceedances_A2 , color = "Number of Exceedances"), size = 2) +
+  geom_line(aes(y = num_exceedances_A2, color = "Number of Exceedances"), size = 1) +
   labs(x = "Year", y = "Number per year") +
   theme_classic() +
   theme(plot.background = element_blank()) +
   scale_color_manual(values = c("blue", "red"), guide="none")
 
-
-# Aggregated intensity above 0 for all years ----------
-dev.new(height=5, width=5, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
-
-#Aggregated intensity by year
-agg_intensity_df <- covariates %>%
-  group_by(Year) %>%
-  summarise(agg_intensity = sum(intensity_above_0, na.rm = TRUE), .groups = "drop")
-
-# Remove last year
-agg_intensity_df <- agg_intensity_df[agg_intensity_df$Year != max(agg_intensity_df$Year),]
-
-# Compute number of exceedances for each year
-# NOTE: Below filters out exceedances corresponding to dsmaxdt =0 to make sure plots
-# are comparing observed values which correspond to how intensity was estimated
-
-gron_eq_cat_exceed_0 <- gron_eq_cat[gron_eq_cat$Magnitude > 0,]
-num_exceedances_per_year <- gron_eq_cat_exceed_0 %>% filter(dsmaxdt > 0) %>%
-  group_by(Year) %>%
-  summarise(num_exceedances = n(), .groups = "drop")
-
-# Convert Year to numeric for merging
-agg_intensity_df$Year <- as.numeric(as.character(agg_intensity_df$Year))
-
-# Merge the two data frames
-agg_intensity_df <- agg_intensity_df %>%
-  left_join(num_exceedances_per_year, by = "Year")
-
-# Plot agg intensity and number of exceedances against year
+# Plot agg intensity above 0 and number of exceedances against year
 ggplot(agg_intensity_df, aes(x = Year)) +
-  geom_point(aes(y = agg_intensity*grid_box_area, color = "Aggregated Intensity"), size = 2) +
-  geom_line(aes(y = agg_intensity*grid_box_area, color = "Aggregated Intensity"), size = 1) +
-  geom_point(aes(y = num_exceedances , color = "Number of Exceedances"), size = 2) +
-  geom_line(aes(y = num_exceedances, color = "Number of Exceedances"), size = 1) +
+  geom_point(aes(y = agg_intensity_0*grid_box_area, color = "Aggregated Intensity"), size = 2) +
+  geom_line(aes(y = agg_intensity_0*grid_box_area, color = "Aggregated Intensity"), size = 1) +
+  geom_ribbon(aes(ymin = lower_CI_0_Alg2*grid_box_area, ymax = upper_CI_0_Alg2*grid_box_area), alpha = 0.2, fill = "blue") +
+  geom_point(aes(y = num_exceedances_0 , color = "Number of Exceedances"), size = 2) +
+  geom_line(aes(y = num_exceedances_0, color = "Number of Exceedances"), size = 1) +
   labs(x = "Year", y = "Number per year") +
   theme_classic() +
   theme(plot.background = element_blank()) +
@@ -379,14 +709,94 @@ ggplot(agg_intensity_df, aes(x = Year)) +
 
 # Proportion observed relative to expected (above 0)---------
 ggplot(agg_intensity_df, aes(x = Year)) +
-  geom_point(aes(y = num_exceedances/(agg_intensity*grid_box_area), color = "Proportion observed"), size = 2) +
-  geom_line(aes(y = num_exceedances/(agg_intensity*grid_box_area), color = "Proportion observed"), size = 1) +
+  geom_point(aes(y = num_exceedances_0/(agg_intensity_0*grid_box_area), color = "Proportion observed"), size = 2) +
+  geom_line(aes(y = num_exceedances_0/(agg_intensity_0*grid_box_area), color = "Proportion observed"), size = 1) +
   labs(x = "Year", y = "Proportion observed") +
   theme_classic() +
   theme(plot.background = element_blank()) +
   scale_color_discrete(guide="none")
 
+dev.off()
 
+# Alg 3 only
+pdf(file = output_paths$fig_7_Alg3, height=5, width=5)
+par(mfrow=c(1,3), bg='transparent')
+
+# Plot agg intensity above A2 and number of exceedances against year
+ggplot(agg_intensity_df, aes(x = Year)) +
+  geom_point(aes(y = agg_intensity_A2*grid_box_area, color = "Aggregated Intensity"), size = 2) +
+  geom_line(aes(y = agg_intensity_A2*grid_box_area, color = "Aggregated Intensity"), size = 1) +
+  geom_ribbon(aes(ymin = lower_CI_A2_Alg3*grid_box_area, ymax = upper_CI_A2_Alg3*grid_box_area), alpha = 0.5, fill = "blue", colour="black", linetype="dashed") +
+  geom_point(aes(y = num_exceedances_A2 , color = "Number of Exceedances"), size = 2) +
+  geom_line(aes(y = num_exceedances_A2, color = "Number of Exceedances"), size = 1) +
+  labs(x = "Year", y = "Number per year") +
+  theme_classic() +
+  theme(plot.background = element_blank()) +
+  scale_color_manual(values = c("blue", "red"), guide="none")
+
+# Plot agg intensity above 0 and number of exceedances against year
+ggplot(agg_intensity_df, aes(x = Year)) +
+  geom_point(aes(y = agg_intensity_0*grid_box_area, color = "Aggregated Intensity"), size = 2) +
+  geom_line(aes(y = agg_intensity_0*grid_box_area, color = "Aggregated Intensity"), size = 1) +
+  geom_ribbon(aes(ymin = lower_CI_0_Alg3*grid_box_area, ymax = upper_CI_0_Alg3*grid_box_area), alpha = 0.5, fill = "blue", colour="black", linetype="dashed") +
+  geom_point(aes(y = num_exceedances_0 , color = "Number of Exceedances"), size = 2) +
+  geom_line(aes(y = num_exceedances_0, color = "Number of Exceedances"), size = 1) +
+  labs(x = "Year", y = "Number per year") +
+  theme_classic() +
+  theme(plot.background = element_blank()) +
+  scale_color_manual(values = c("blue", "red"), guide="none")
+
+# Proportion observed relative to expected (above 0)---------
+ggplot(agg_intensity_df, aes(x = Year)) +
+  geom_point(aes(y = num_exceedances_0/(agg_intensity_0*grid_box_area), color = "Proportion observed"), size = 2) +
+  geom_line(aes(y = num_exceedances_0/(agg_intensity_0*grid_box_area), color = "Proportion observed"), size = 1) +
+  labs(x = "Year", y = "Proportion observed") +
+  theme_classic() +
+  theme(plot.background = element_blank()) +
+  scale_color_discrete(guide="none")
+
+dev.off()
+
+# Alg 2 and 3
+pdf(file = output_paths$fig_7_Alg2_and_3, height=5, width=5)
+par(mfrow=c(1,3), bg='transparent')
+
+# Plot agg intensity above A2 and number of exceedances against year
+ggplot(agg_intensity_df, aes(x = Year)) +
+  geom_point(aes(y = agg_intensity_A2*grid_box_area, color = "Aggregated Intensity"), size = 2) +
+  geom_line(aes(y = agg_intensity_A2*grid_box_area, color = "Aggregated Intensity"), size = 1) +
+  geom_ribbon(aes(ymin = lower_CI_A2_Alg2*grid_box_area, ymax = upper_CI_A2_Alg2*grid_box_area), alpha = 0, fill = "blue", colour="black", linetype="dashed") +
+  geom_ribbon(aes(ymin = lower_CI_A2_Alg3*grid_box_area, ymax = upper_CI_A2_Alg3*grid_box_area), alpha = 0.2, fill = "blue") +
+  geom_point(aes(y = num_exceedances_A2 , color = "Number of Exceedances"), size = 2) +
+  geom_line(aes(y = num_exceedances_A2, color = "Number of Exceedances"), size = 1) +
+  labs(x = "Year", y = "Number per year") +
+  theme_classic() +
+  theme(plot.background = element_blank()) +
+  scale_color_manual(values = c("blue", "red"), guide="none")
+
+# Plot agg intensity above 0 and number of exceedances against year
+ggplot(agg_intensity_df, aes(x = Year)) +
+  geom_point(aes(y = agg_intensity_0*grid_box_area, color = "Aggregated Intensity"), size = 2) +
+  geom_line(aes(y = agg_intensity_0*grid_box_area, color = "Aggregated Intensity"), size = 1) +
+  geom_ribbon(aes(ymin = lower_CI_0_Alg2*grid_box_area, ymax = upper_CI_0_Alg2*grid_box_area), alpha = 0, fill = "blue", colour="black", linetype="dashed") +
+  geom_ribbon(aes(ymin = lower_CI_0_Alg3*grid_box_area, ymax = upper_CI_0_Alg3*grid_box_area), alpha = 0.2, fill = "blue") +
+  geom_point(aes(y = num_exceedances_0 , color = "Number of Exceedances"), size = 2) +
+  geom_line(aes(y = num_exceedances_0, color = "Number of Exceedances"), size = 1) +
+  labs(x = "Year", y = "Number per year") +
+  theme_classic() +
+  theme(plot.background = element_blank()) +
+  scale_color_manual(values = c("blue", "red"), guide="none")
+
+# Proportion observed relative to expected (above 0)---------
+ggplot(agg_intensity_df, aes(x = Year)) +
+  geom_point(aes(y = num_exceedances_0/(agg_intensity_0*grid_box_area), color = "Proportion observed"), size = 2) +
+  geom_line(aes(y = num_exceedances_0/(agg_intensity_0*grid_box_area), color = "Proportion observed"), size = 1) +
+  labs(x = "Year", y = "Proportion observed") +
+  theme_classic() +
+  theme(plot.background = element_blank()) +
+  scale_color_discrete(guide="none")
+
+dev.off()
 
 
 # Figure 8 ----------------------------------------------------------------
@@ -394,8 +804,7 @@ ggplot(agg_intensity_df, aes(x = Year)) +
 # NOTE: Below filters out exceedances corresponding to dsmaxdt = 0 to make sure plots
 # are comparing observed values which correspond to how intensity was estimated
 
-dev.new(height=5, width=10, noRStudioGD = TRUE)
-par(mfrow=c(1,1), bg='transparent')
+
 chosen_years <- c("2010", "2020")
 
 covariates_for_2010 <- covariates %>% filter(Year == "2010") %>% group_by(Easting, Northing) %>%
@@ -421,11 +830,16 @@ plot_intensity_for_year <- function(year) {
     geom_tile() + fixed_plot_aspect(ratio = 1) + theme_classic() +
     theme(plot.background = element_blank()) + scale_fill_gradient(low = "blue", high = "red", limits = fill_limits) +
     geom_point(data = current_exceedances, aes(x = Easting, y = Northing), size=1, shape=19, fill = "black")  + 
-    labs(x = "Easting (m)", y = "Northing (m)", fill = expression(Lambda[u])) + coord_fixed() 
+    labs(x = "Easting (km)", y = "Northing (km)", fill = expression(Lambda[u])) + coord_fixed() +
+    scale_x_continuous(labels = function(x) x / 1000) +
+    scale_y_continuous(labels = function(y) y / 1000)
 }
 
 # Generate plots
 plots <- lapply(chosen_years, plot_intensity_for_year)
+
+pdf(file = output_paths$fig_8, height = 5, width = 10)
+par(mfrow = c(1,1), bg = 'transparent')
 
 # Confirm that both are valid ggplot objects
 if (all(sapply(plots, inherits, "ggplot"))) {
@@ -435,6 +849,7 @@ if (all(sapply(plots, inherits, "ggplot"))) {
   stop("One or more plots are not ggplot objects.")
 }
 
+dev.off()
 
 # Figure 9 ----------------------------------------------------------------
 
@@ -447,7 +862,7 @@ thresh_par_Alg2 <- do.call(rbind,lapply(threshold_values_uncertainty_results_Alg
   x$thresh_par
 }))
 
-threshold_A2_over_G <- covariates_in_G %>% group_by(Date) %>%
+threshold_A2_over_G <- covariates %>% filter(in_field) %>% group_by(Date) %>%
   summarise(mean_thresh = mean(thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V2, na.rm = TRUE), .groups = "drop")
 
 dev.new(height=5, width=5, noRStudioGD = TRUE)
@@ -457,7 +872,8 @@ plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab = "Time", ylab = "Av
 
 mean_mat <- matrix(0, nrow = nrow(thresh_par_Alg2), ncol = length(unique(covariates_in_G$Date)))
 for(i in 1:nrow(thresh_par_Alg2)) {
-  average_boot_thresh <- covariates_in_G %>%
+  average_boot_thresh <- covariates %>% 
+    filter(in_field) %>%
     group_by(Date) %>%
     summarise(mean_thresh = mean(thresh_par_Alg2[i, 1] + thresh_par_Alg2[i, 2] * V2, na.rm = TRUE), .groups = "drop")
   mean_mat[i, ] <- average_boot_thresh$mean_thresh
@@ -478,8 +894,7 @@ chosen_models <- do.call(rbind, lapply(bootstrap_model_selection_results_Alg3, f
   x$chosen_form
 }))
 
-threshold_A2_over_G <- covariates_in_G %>% group_by(Date) %>%
-  summarise(mean_thresh = mean(thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V2, na.rm = TRUE), .groups = "drop")
+covariates_in_G <- covariates %>% filter(in_field)
 
 covariates_distances_in_G <- cbind(covariates_in_G$V1, covariates_in_G$V2, covariates_in_G$V3, covariates_in_G$V4,
                                    log(covariates_in_G$V1), log(covariates_in_G$V2), log(covariates_in_G$V3), log(covariates_in_G$V4),
@@ -504,7 +919,5 @@ upper_bound <- apply(mean_mat, 2, quantile, probs = 0.975)
 lower_bound <- apply(mean_mat, 2, quantile, probs = 0.025)
 lines(as.Date(average_boot_thresh$Date[-1]), upper_bound[-1], col="darkorange", lwd=2)
 lines(as.Date(average_boot_thresh$Date[-1]), lower_bound[-1], col="darkorange", lwd=2)
-
-
 
 

@@ -55,17 +55,20 @@ utilising the expected quantile discrepancy (EQD) method.
 intensity function (based on a Poisson process likelihood) to the
 earthquake locations.
 
-### `/Data`
+### `/data`
 
 This section contains the datasets used in our analysis, namely the
-Groningen earthquake catalogue and the geophone dataset. Unfortunately,
-the stress covariate data is too large to store in this repository,
-however it is available upon request.
+Groningen earthquake catalogue, the geophone dataset and the stress
+covariate data. The covariate date is split into yearly files to allow
+upload to this repository.
 
-### `/output`
+### `/analyses`
 
 `main_figures.R` contains code to reproduce Figures 1-9 of the main
 text.
+
+`supplementary_figures` contains code to generate the tables and figures
+contained in the supplementary material.
 
 `threshold_estimation.R` contains the code to utilise `eqd_geo.R` to
 select the appropriate threshold parameter values for each of the 12
@@ -76,11 +79,14 @@ text.
 threshold fit. These values appear in Table 1 in Section 6.1 of the main
 text.
 
-### `/threshold_results`
+### `/outputs`
 
-This folder contains the chosen thresholds, estimated GPD parameter
-values, number of excesses and EQD distances for each of the 12
-threshold function formulations. It also contains the same run with
+`/figures` contains the generated figures from the main text and
+supplementary material.
+
+`/threshold_results` contains the chosen thresholds, estimated GPD
+parameter values, number of excesses and EQD distances for each of the
+12 threshold function formulations. It also contains the same run with
 B=1000 bootstraps in the `/boot1000` folder.
 
 ### `/in_development`
@@ -94,9 +100,6 @@ endpoints and design levels.
 `gron_eq_cat_covariate_inclusion.R` contains code to process the stress
 data and extract stress values for each observed earthquake location.
 
-`supplementary_figures` contains code to generate the figures contained
-in the supplementary material.
-
 `uncertainty_algorithms.R` contains code relevant for utilising the
 uncertainty algorithms developed in Section 5 of the paper.
 
@@ -108,5 +111,5 @@ uncertainty algorithms.
 
 ### Contact
 
-If you have questions, please contact <c.murphy4@lancaster.ac.uk>.
-Please include “Induced code” in the subject of the email.
+If you have questions, please contact <murphyconor148@gmail.com> .
+Please include “Induced seismicity code” in the subject of the email.

@@ -6,8 +6,13 @@ source("src/helper_functions.R")
 gron_eq_cat <- read.csv("Data/Events/unrounded_after_1995_in_polygon_with_covariates.csv", header=T)
 mags <- gron_eq_cat$Magnitude
 nearest_dist_matrix <- matrix(c(gron_eq_cat$V_1, gron_eq_cat$V_2, gron_eq_cat$V_3, gron_eq_cat$V_4), byrow=F, ncol=4)
-covariates <- read.csv("Data/covariates/covariates_1995-2024.csv", header=T)
-
+covariates <- do.call(
+  rbind,
+  lapply(1995:2024, function(y) {
+    read.csv(paste0("data/covariates/covariates_by_year/covariates_", y, ".csv"), header = TRUE)
+  })
+)
+covariates <- covariates %>% filter(MonthYear <= "2024-01")
 # Threshold results
 
 #ICS max (B=200) - Results shown in paper
