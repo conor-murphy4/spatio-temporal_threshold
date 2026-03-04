@@ -1,12 +1,9 @@
 # Code to reproduce figures in the main text 
 
 # Load required datasets -------------------------------------------------------
-# TODO: Should we also add file paths for threshold results here?
 file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
-  covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2024.csv",
-  covariates_full_period = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2055.csv",
-  future_covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_2024-2055.csv",
+  covariates = "data/covariates/covariates_by_year/covariates_",
   geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
   gron_outline = "data/geophones/Groningen_Field_outline.csv",
   gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
@@ -14,17 +11,10 @@ file_paths <- list(
   alg3_results = "in_development/uncertainty/bootstrap_model_selection_results_Alg3.rds"
 )
 
-# TODO: Remove unnecessary file paths?
 # TODO: Change file paths when moved out of in_development
-# TODO: Set up file same as main_figures.R and include relevant output paths
-# TODO: Edit file path for covariates once set up properly in repo
 
 output_paths <- list(
-  fig_1 = "outputs/figures/main/fig_1_eq_cat.pdf",
-  fig_2 = "outputs/figures/main/fig_2_geophone_network.pdf", 
-  fig_3a = "outputs/figures/main/fig_3a_average_kaiser_stress_2020.pdf",
-  fig_3b = "outputs/figures/main/fig_3b_temporal_kaiser_stress.pdf", 
-  data_3 = "Data/covariates/average_ICS_max_1995-2055.rds",
+  fig_S1 = "outputs/figures/supp/fig_S1_kaiser_stress_boxplot.pdf",
   fig_S2 = "outputs/figures/supp/fig_S2_spatial_bootstrap_SE.pdf",
   fig_S3 = "outputs/figures/supp/fig_S3_sigma_0_variation.pdf",
   fig_S4 = "outputs/figures/supp/fig_S4_ppplots.pdf",
@@ -37,16 +27,11 @@ chosen_times <- c("1995-04-01", "2005-01-01", "2015-01-01", "2024-01-01")
 
 alg3_results <- readRDS(file_paths$alg3_results)
 
-
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
-covariates <- read.csv(file_paths$covariates, header = TRUE)
-covariates_2055 <- read.csv(file_paths$covariates_full_period, header = TRUE)
-future_covariates <- read.csv(file_paths$future_covariates, header = TRUE)
 geophones_deepest <- read.csv(file_paths$geophones_deepest, header = TRUE, row.names = 1)
 gron_outline <- read.csv(file_paths$gron_outline, header = TRUE)
 gron_polygon <- read.table(file_paths$gron_polygon, header = TRUE)
 
-covariates_in_G <- read.csv(file_paths$covariates_in_G, header = TRUE)
 
 gron_rect <- data.frame(X = c(210000, 275000, 275000, 210000, 210000),
                         Y = c(560000, 560000, 625000, 625000, 560000))
@@ -66,8 +51,23 @@ library(patchwork)
 source("src/helper_functions.R")
 source("src/intensity_estimation.R")
 
-# Table S1 -----------------------------------------------------------------
+# Creating relevant covariate files
+covariates <- do.call(
+  rbind,
+  lapply(1995:2024, function(y) {
+    read.csv(paste0(file_paths$covariates, y, ".csv"), header = TRUE)
+  })
+)
+covariates <- covariates %>% filter(MonthYear <= "2024-01")
 
+future_covariates <- do.call(
+  rbind,
+  lapply(2025:2055, function(y) {
+    read.csv(paste0(file_paths$covariates, y, ".csv"), header = TRUE)
+  })
+)
+
+# Table S1 -----------------------------------------------------------------
 
 # Proportion of models chosen
 chosen_models <- numeric(200)
@@ -76,6 +76,20 @@ for(i in 1:200){
 }
 table(chosen_models)
 prop.table(table(chosen_models))
+
+
+# Figure S.1 --------------------------------------------------------------
+
+# Boxplot of magnitude values (greater than 1.45) for Kaiser stress levels above and below median
+
+gron_eq_cat <- gron_eq_cat %>%
+  mutate(kaiser_stress_level = ifelse(ICS_max > median(ICS_max, na.rm = TRUE), "High KS", "Low KS"))
+
+# Plot boxplot with low KS category first
+path <- output_paths$fig_S1
+pdf(file = path, height = 5, width = 5)
+boxplot(Magnitude ~ factor(kaiser_stress_level, levels = c("Low KS", "High KS")), data = gron_eq_cat %>% filter(Magnitude > 1.45), xlab="", ylab = expression(Magnitude ~(M[L])))
+dev.off()
 
 # Figure S.2 --------------------------------------------------------------
 

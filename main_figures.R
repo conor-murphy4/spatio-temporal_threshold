@@ -1,22 +1,19 @@
 # Code to reproduce figures in the main text 
 
 # Load required datasets -------------------------------------------------------
-# TODO: Should we also add file paths for threshold results here?
-# TODO: Remove unnecessry ones?
-# TODO: Update all figure generation to be consistent (file paths, output paths, pdf(), etc.)
 file_paths <- list(
   gron_eq_cat = "data/events/unrounded_after_1995_in_polygon_with_covariates.csv",
-  covariates = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2024.csv",
-  covariates_full_period = "C:/Users/murphyc4/OneDrive/OneDrive - Lancaster/STOR-i/PhD/Projects/Induced-seismicity/Other code files/Messy versions/Data/covariates/covariates_1995-2055.csv",
+  covariates = "data/covariates/covariates_by_year/covariates_",
   geophones_deepest = "data/geophones/Geophones_processed_03-07-2024_deepest_only.csv",
   gron_outline = "data/geophones/Groningen_Field_outline.csv",
   gron_polygon = "data/geophones/polygon_for_groningen_earthquakes.txt", 
-  covariates_in_G = "data/covariates/covariates_in_gasfield_1995-2024.csv",
   alg2_intensity = "in_development/uncertainty/bootstrap_intensity_fits_Alg2.rds",
   alg3_intensity = "in_development/uncertainty/bootstrap_intensity_fits_Alg3.rds",
   alg2_results = "in_development/uncertainty/threshold_values_uncertainty_results_Alg2.rds",
   alg3_results = "in_development/uncertainty/bootstrap_model_selection_results_Alg3.rds"
 )
+
+# TODO: Change file paths when moved out of in_development
 
 output_paths <- list(
   fig_1 = "outputs/figures/main/fig_1_eq_cat.pdf",
@@ -30,26 +27,18 @@ output_paths <- list(
   fig_7_Alg3 = "outputs/figures/main/fig_7_eq_occurrence_properties_Alg3.pdf",
   fig_7_Alg2_and_3 = "outputs/figures/main/fig_7_eq_occurrence_properties_Alg2_and_3.pdf",
   fig_8 = "outputs/figures/main/fig_8_intensity_maps.pdf",
-  data_3 = "Data/covariates/average_ICS_max_1995-2055.rds"
+  data_3 = "data/covariates/average_ICS_max_1995-2055.rds"
 )
-
 
 chosen_years <- c("2010", "2020") # in Figure 2, plot geophone networks in these years
 
 gron_eq_cat <- read.csv(file_paths$gron_eq_cat, header = TRUE)
-covariates <- read.csv(file_paths$covariates, header = TRUE)
-covariates_2055 <- read.csv(file_paths$covariates_full_period, header = TRUE)
 geophones_deepest <- read.csv(file_paths$geophones_deepest, header = TRUE, row.names = 1)
 gron_outline <- read.csv(file_paths$gron_outline, header = TRUE)
 gron_polygon <- read.table(file_paths$gron_polygon, header = TRUE)
 
-covariates_in_G <- read.csv(file_paths$covariates_in_G, header = TRUE)
-
 gron_rect <- data.frame(X = c(210000, 275000, 275000, 210000, 210000),
                         Y = c(560000, 560000, 625000, 625000, 560000))
-location_1 <- data.frame(Easting  = 250000, Northing = 575000)
-location_2 <- data.frame(Easting = 250000, Northing = 590000)
-location_3 <- data.frame(Easting = 250000, Northing = 605000)
 
 locations <- data.frame(Easting = c(250000, 250000, 250000), 
                         Northing = c(575000, 590000, 605000))
@@ -66,6 +55,21 @@ library(patchwork)
 source("src/helper_functions.R")
 source("src/intensity_estimation.R")
 
+# Creating relevant covariate files
+covariates <- do.call(
+  rbind,
+  lapply(1995:2024, function(y) {
+    read.csv(paste0(file_paths$covariates, y, ".csv"), header = TRUE)
+  })
+)
+covariates <- covariates %>% filter(MonthYear <= "2024-01")
+
+covariates_2055 <- do.call(
+  rbind,
+  lapply(1995:2055, function(y) {
+    read.csv(paste0(file_paths$covariates, y, ".csv"), header = TRUE)
+  })
+)
 
 # Figure 1 ----------------------------------------------------------------
 
@@ -247,8 +251,7 @@ plot_df <- current_covariates %>%
 
 # Plot
 
-#dev.new(height = 5, width = 5, noRStudioGD = TRUE)
-#par(mfrow = c(1,1), bg = 'transparent')
+
 path <- output_paths$fig_3a 
 pdf(file = path, height = 5, width = 5)
 ggplot(
@@ -631,11 +634,6 @@ for (i in 1:nrow(boot_intensity_fits_Alg2)) {
     pull(agg_intensity)
 }
 
-saveRDS(boot_mat_A2_Alg2, file = "in_development/uncertainty/bootstrap_aggregated_intensity_A2_Alg2.rds")
-saveRDS(boot_mat_0_Alg2, file = "in_development/uncertainty/bootstrap_aggregated_intensity_0_Alg2.rds")
-
-boot_mat_A2_Alg2 <- readRDS("in_development/uncertainty/bootstrap_aggregated_intensity_A2_Alg2.rds")
-boot_mat_0_Alg2 <- readRDS("in_development/uncertainty/bootstrap_aggregated_intensity_0_Alg2.rds")
 
 agg_intensity_df$lower_CI_A2_Alg2 <- apply(boot_mat_A2_Alg2, 2, quantile, probs = 0.025)
 agg_intensity_df$upper_CI_A2_Alg2 <- apply(boot_mat_A2_Alg2, 2, quantile, probs = 0.975)
@@ -675,20 +673,11 @@ for (i in 1:nrow(boot_intensity_fits_Alg3)) {
     pull(agg_intensity)
 }
 
-saveRDS(boot_mat_A2_Alg3, file = "in_development/uncertainty/bootstrap_aggregated_intensity_A2_Alg3.rds")
-saveRDS(boot_mat_0_Alg3, file = "in_development/uncertainty/bootstrap_aggregated_intensity_0_Alg3.rds")
-
-boot_mat_A2_Alg3 <- readRDS("in_development/uncertainty/bootstrap_aggregated_intensity_A2_Alg3.rds")
-boot_mat_0_Alg3 <- readRDS("in_development/uncertainty/bootstrap_aggregated_intensity_0_Alg3.rds")
-
 agg_intensity_df$lower_CI_A2_Alg3 <- apply(boot_mat_A2_Alg3, 2, quantile, probs = 0.025)
 agg_intensity_df$upper_CI_A2_Alg3 <- apply(boot_mat_A2_Alg3, 2, quantile, probs = 0.975)
 agg_intensity_df$lower_CI_0_Alg3 <- apply(boot_mat_0_Alg3, 2, quantile, probs = 0.025)
 agg_intensity_df$upper_CI_0_Alg3 <- apply(boot_mat_0_Alg3, 2, quantile, probs = 0.975)
 
-saveRDS(agg_intensity_df, file = "in_development/uncertainty/agg_intensity_df.rds" )
-
-agg_intensity_df <- readRDS(file = "in_development/uncertainty/agg_intensity_df.rds")
 
 # Alg 2 only
 pdf(file = output_paths$fig_7_Alg2, height=5, width=5)
@@ -844,7 +833,7 @@ plot_intensity_for_year <- function(year) {
     labs(x = "Easting (km)", y = "Northing (km)", fill = expression(Lambda[u])) + coord_fixed() +
     scale_x_continuous(labels = function(x) x / 1000) +
     scale_y_continuous(labels = function(y) y / 1000)
-  }
+}
 
 # Generate plots
 plots <- lapply(chosen_years, plot_intensity_for_year)
@@ -873,7 +862,7 @@ thresh_par_Alg2 <- do.call(rbind,lapply(threshold_values_uncertainty_results_Alg
   x$thresh_par
 }))
 
-threshold_A2_over_G <- covariates_in_G %>% group_by(Date) %>%
+threshold_A2_over_G <- covariates %>% filter(in_field) %>% group_by(Date) %>%
   summarise(mean_thresh = mean(thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V2, na.rm = TRUE), .groups = "drop")
 
 dev.new(height=5, width=5, noRStudioGD = TRUE)
@@ -883,7 +872,8 @@ plot(as.Date(gron_eq_cat$Date), gron_eq_cat$Magnitude, xlab = "Time", ylab = "Av
 
 mean_mat <- matrix(0, nrow = nrow(thresh_par_Alg2), ncol = length(unique(covariates_in_G$Date)))
 for(i in 1:nrow(thresh_par_Alg2)) {
-  average_boot_thresh <- covariates_in_G %>%
+  average_boot_thresh <- covariates %>% 
+    filter(in_field) %>%
     group_by(Date) %>%
     summarise(mean_thresh = mean(thresh_par_Alg2[i, 1] + thresh_par_Alg2[i, 2] * V2, na.rm = TRUE), .groups = "drop")
   mean_mat[i, ] <- average_boot_thresh$mean_thresh
@@ -904,8 +894,7 @@ chosen_models <- do.call(rbind, lapply(bootstrap_model_selection_results_Alg3, f
   x$chosen_form
 }))
 
-threshold_A2_over_G <- covariates_in_G %>% group_by(Date) %>%
-  summarise(mean_thresh = mean(thresh_fit_A2$thresh_par[1] + thresh_fit_A2$thresh_par[2] * V2, na.rm = TRUE), .groups = "drop")
+covariates_in_G <- covariates %>% filter(in_field)
 
 covariates_distances_in_G <- cbind(covariates_in_G$V1, covariates_in_G$V2, covariates_in_G$V3, covariates_in_G$V4,
                                    log(covariates_in_G$V1), log(covariates_in_G$V2), log(covariates_in_G$V3), log(covariates_in_G$V4),
