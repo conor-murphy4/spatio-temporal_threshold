@@ -618,7 +618,6 @@ boot_mat_A2_Alg2 <- boot_mat_0_Alg2 <- matrix(NA,
                                               nrow = nrow(boot_intensity_fits_Alg2), 
                                               ncol = nrow(agg_intensity_df))
 
-# TODO resulting_intensity function has been changed for this.. Make sure other related code is edited accordingly
 for (i in 1:nrow(boot_intensity_fits_Alg2)) {
   covariates$boot_thresh <- threshold_fit_Alg2[[i]]$thresh_par[1] + threshold_fit_Alg2[[i]]$thresh_par[2] * covariates$V2
   covariates$boot_intensity_A2 <- resulting_intensity_icsmax(boot_intensity_fits_Alg2[i,], covariates, covariates$boot_thresh, threshold_fit_Alg2[[i]]$par)
@@ -657,7 +656,6 @@ boot_mat_A2_Alg3 <-  boot_mat_0_Alg3 <- matrix(NA,
                                                nrow = nrow(boot_intensity_fits_Alg3), 
                                                ncol = nrow(agg_intensity_df))
 
-# TODO resulting_intensity function has been changed for this.. Make sure other related code is edited accordingly
 for (i in 1:nrow(boot_intensity_fits_Alg3)) {
   covariates$boot_thresh <- threshold_fit_Alg3[[i]]$model_results$thresh_par[1] + threshold_fit_Alg3[[i]]$model_results$thresh_par[2] * covariates_distances[,chosen_models[i]]
   covariates$boot_intensity_A2 <- resulting_intensity_icsmax(boot_intensity_fits_Alg3[i,], covariates, covariates$boot_thresh, threshold_fit_Alg3[[i]]$model_results$par)

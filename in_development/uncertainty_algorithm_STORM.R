@@ -1,4 +1,4 @@
-
+# TODO: Make sure resulting intensity function implemented correctly after update
 
 # Alg3: Model selection for non-parametric bootstraps --------------------------
 

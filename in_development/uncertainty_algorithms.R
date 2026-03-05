@@ -1,6 +1,8 @@
 source("src/eqd_geo.R")
 source("intensity_estimation.R")
 
+# TODO: Make sure resulting intensity function implemented correctly after update
+
 generate_non_par_bootstrap_samples <- function(data, n_samples) {
   n <- nrow(data)
   samples <- vector("list", n_samples)
